@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "bugpilot"
+version = "1.0.0"
+description = "AI-Powered Engineering Bug Intelligence Agent"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "BugPilot Team" }]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["backend*", "models*", "agents*", "analytics*", "mcp_server*", "mcp_client*", "providers*"]
+
+# =============================================================================
+# Pytest configuration
+# =============================================================================
+[tool.pytest.ini_options]
+asyncio_mode   = "auto"
+pythonpath     = ["."]
+testpaths      = ["tests"]
+addopts        = "-v --tb=short"
+markers        = ["llm: integration tests calling real Gemini LLM API"]
+
+# =============================================================================
+# Coverage
+# =============================================================================
+[tool.coverage.run]
+source  = ["backend", "models", "agents", "analytics", "providers", "mcp_server", "mcp_client"]
+omit    = ["tests/*", "**/__pycache__/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty   = true
+
+# =============================================================================
+# Ruff (linting) — optional, install separately
+# =============================================================================
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]

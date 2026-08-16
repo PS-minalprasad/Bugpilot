@@ -1,0 +1,40 @@
+# =============================================================================
+# BugPilot — Python Dependencies
+# Verified with: python -m venv .venv && pip install -r requirements.txt (287/287 tests pass)
+# =============================================================================
+
+# ---- Core API -----------------------------------------------------------
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.1        # required by pydantic-settings' env_file=".env" loading
+
+# ---- HTTP client (used by tests, MCP client, and the Jira Cloud provider) --
+httpx>=0.27.0
+
+# ---- MCP Protocol (Official SDK) ----------------------------------------
+mcp>=1.0.0
+
+# ---- Database (Phase 2/15+: SQLAlchemy ORM + Alembic migrations) --------
+# DATABASE_URL defaults to a local SQLite file (sqlite:///./bugpilot.db),
+# so no separate DB driver is required out of the box.
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+# psycopg2-binary>=2.9.9    # Uncomment only if DATABASE_URL is pointed at a real PostgreSQL server
+
+# ---- Security & Auth (Phase 15: JWT + bcrypt password hashing) ----------
+passlib[bcrypt]>=1.7.4
+bcrypt==4.0.1                # Pinned: passlib's bcrypt-backend detection breaks on bcrypt>=4.1
+pyjwt>=2.8.0
+
+# ---- Report generation (generate_pdf.py) ---------------------------------
+reportlab>=4.0.0
+
+# ---- Utilities ------------------------------------------------------------
+rich>=13.7.0
+
+# ---- Testing ----------------------------------------------------------
+pytest>=8.1.0
+pytest-asyncio>=0.23.0
+pytest-cov>=5.0.0

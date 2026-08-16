@@ -1,0 +1,592 @@
+{
+  "generated_at": "2026-08-16T08:55:59.957339Z",
+  "system": "BugPilot Multi-Agent Engineering Intelligence Platform",
+  "agent_evaluation": {
+    "total_queries": 20,
+    "passed_queries": 18,
+    "failed_queries": 2,
+    "intent_accuracy": 0.95,
+    "agent_routing_accuracy": 1.0,
+    "mcp_tool_accuracy": 0.95,
+    "task_success_rate": 0.9,
+    "groundedness_rate": 0.85,
+    "hallucination_rate": 0.0,
+    "tool_call_success_rate": 1.0,
+    "tool_usage_efficiency": 0.9167,
+    "recovery_rate": 1.0,
+    "average_reflection_score": 0.91,
+    "latency": {
+      "mean": 0.0231,
+      "p50": 0.0046,
+      "p95": 0.0106,
+      "p99": 0.3626,
+      "max": 0.3626
+    },
+    "results": [
+      {
+        "query_id": "eval-01-specific-bug-key",
+        "query": "What is the status of BP-999?",
+        "category": "specific_bug",
+        "detected_intent": "SPECIFIC_BUG",
+        "expected_intent": "SPECIFIC_BUG",
+        "intent_correct": true,
+        "agents_used": [
+          "Bug Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_bug"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CORRECT",
+        "reflection_quality_score": 0.55,
+        "latency_seconds": 0.3626,
+        "final_answer_snippet": "# Bug Analysis Report \u2014 BP-999  ## 1. Executive Summary  **BP-999** is an **open, critical-severity** issue in the **Aut..."
+      },
+      {
+        "query_id": "eval-02-specific-bug-component",
+        "query": "Tell me about the Authentication bug",
+        "category": "specific_bug",
+        "detected_intent": "SPECIFIC_BUG",
+        "expected_intent": "SPECIFIC_BUG",
+        "intent_correct": true,
+        "agents_used": [
+          "Bug Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "search_bugs"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CORRECT",
+        "reflection_quality_score": 0.55,
+        "latency_seconds": 0.0078,
+        "final_answer_snippet": "# Bug Analysis Report \u2014 BP-999  ## 1. Executive Summary  **BP-999** is an **open, critical-severity** issue in the **Aut..."
+      },
+      {
+        "query_id": "eval-03-specific-bug-title",
+        "query": "Show details for token validation error",
+        "category": "specific_bug",
+        "detected_intent": "SPECIFIC_BUG",
+        "expected_intent": "SPECIFIC_BUG",
+        "intent_correct": true,
+        "agents_used": [
+          "Bug Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "search_bugs"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CORRECT",
+        "reflection_quality_score": 0.55,
+        "latency_seconds": 0.0049,
+        "final_answer_snippet": "# Bug Analysis Report \u2014 BP-999  ## 1. Executive Summary  **BP-999** is an **open, critical-severity** issue in the **Aut..."
+      },
+      {
+        "query_id": "eval-04-bug-search-open",
+        "query": "Search for all open billing bugs",
+        "category": "search",
+        "detected_intent": "BUG_SEARCH",
+        "expected_intent": "BUG_SEARCH",
+        "intent_correct": true,
+        "agents_used": [
+          "Bug Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "search_bugs"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0053,
+        "final_answer_snippet": "I couldn't find a bug matching 'billing'. Please provide a bug ID or more details."
+      },
+      {
+        "query_id": "eval-05-bug-search-critical",
+        "query": "Find critical severity bugs in the project",
+        "category": "search",
+        "detected_intent": "BUG_SEARCH",
+        "expected_intent": "BUG_SEARCH",
+        "intent_correct": true,
+        "agents_used": [
+          "Bug Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "search_bugs"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0038,
+        "final_answer_snippet": "I couldn't find a bug matching 'critical severity the'. Please provide a bug ID or more details."
+      },
+      {
+        "query_id": "eval-06-metrics-summary",
+        "query": "How many total bugs do we have?",
+        "category": "metrics",
+        "detected_intent": "METRIC",
+        "expected_intent": "METRIC",
+        "intent_correct": true,
+        "agents_used": [
+          "Bug Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_bug_metrics"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0064,
+        "final_answer_snippet": "Orchestrated analysis for query: 'How many total bugs do we have?' - Bug Summary: Total 22 bugs, 7 open, 7 critical/high..."
+      },
+      {
+        "query_id": "eval-07-metrics-open-bugs",
+        "query": "How many bugs are currently open?",
+        "category": "metrics",
+        "detected_intent": "METRIC",
+        "expected_intent": "METRIC",
+        "intent_correct": true,
+        "agents_used": [
+          "Bug Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_bug_metrics"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0049,
+        "final_answer_snippet": "Orchestrated analysis for query: 'How many bugs are currently open?' - Bug Summary: Total 22 bugs, 7 open, 7 critical/hi..."
+      },
+      {
+        "query_id": "eval-08-metrics-breakdown",
+        "query": "Show me bug counts by component and severity",
+        "category": "metrics",
+        "detected_intent": "METRIC",
+        "expected_intent": "METRIC",
+        "intent_correct": true,
+        "agents_used": [
+          "Bug Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_bug_metrics"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0035,
+        "final_answer_snippet": "Orchestrated analysis for query: 'Show me bug counts by component and severity' - Bug Summary: Total 22 bugs, 7 open, 7 ..."
+      },
+      {
+        "query_id": "eval-09-trends-general",
+        "query": "What is the current bug trend?",
+        "category": "trends",
+        "detected_intent": "TREND",
+        "expected_intent": "TREND",
+        "intent_correct": true,
+        "agents_used": [
+          "Trend Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_bug_trends"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0042,
+        "final_answer_snippet": "Orchestrated analysis for query: 'What is the current bug trend?' - Trend Analysis: Analyzed 1 historical periods."
+      },
+      {
+        "query_id": "eval-10-trends-component",
+        "query": "Are Authentication bugs increasing this sprint?",
+        "category": "trends",
+        "detected_intent": "TREND",
+        "expected_intent": "TREND",
+        "intent_correct": true,
+        "agents_used": [
+          "Trend Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_bug_trends"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0031,
+        "final_answer_snippet": "Orchestrated analysis for query: 'Are Authentication bugs increasing this sprint?' - Trend Analysis: Analyzed 1 historic..."
+      },
+      {
+        "query_id": "eval-11-risk-highest-component",
+        "query": "Which component has the highest risk?",
+        "category": "risk",
+        "detected_intent": "COMPONENT_ANALYSIS",
+        "expected_intent": "RISK",
+        "intent_correct": true,
+        "agents_used": [
+          "Risk Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_component_risk"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0052,
+        "final_answer_snippet": "# Component Risk Analysis  ## 1. Executive Summary  Highest risk component identified as **Database** with risk score **..."
+      },
+      {
+        "query_id": "eval-12-risk-specific-component",
+        "query": "Analyze component risk for Authentication",
+        "category": "risk",
+        "detected_intent": "COMPONENT_ANALYSIS",
+        "expected_intent": "RISK",
+        "intent_correct": true,
+        "agents_used": [
+          "Risk Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_component_risk"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 0.5,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0038,
+        "final_answer_snippet": "# Component Risk Analysis  ## 1. Executive Summary  Highest risk component identified as **Database** with risk score **..."
+      },
+      {
+        "query_id": "eval-13-release-risk-safety",
+        "query": "Is the upcoming release safe?",
+        "category": "release_risk",
+        "detected_intent": "RELEASE_RISK",
+        "expected_intent": "RELEASE_RISK",
+        "intent_correct": true,
+        "agents_used": [
+          "Risk Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_release_risk"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.004,
+        "final_answer_snippet": "# Release Risk Evaluation  ## 1. Executive Summary  Evaluated release safety and risk exposure across active components...."
+      },
+      {
+        "query_id": "eval-14-aging-bugs",
+        "query": "Show me old unresolved aging bugs",
+        "category": "aging",
+        "detected_intent": "AGING_BUGS",
+        "expected_intent": "AGING_BUGS",
+        "intent_correct": true,
+        "agents_used": [
+          "Risk Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_aging_bugs"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0039,
+        "final_answer_snippet": "# Aging Bugs Analysis  ## 1. Executive Summary  Found **0 unresolved aging bugs** exceeding aging threshold.  ## 2. Prob..."
+      },
+      {
+        "query_id": "eval-15-reopened-bugs",
+        "query": "Which bugs have been reopened multiple times?",
+        "category": "reopened",
+        "detected_intent": "REOPENED_BUGS",
+        "expected_intent": "REOPENED_BUGS",
+        "intent_correct": true,
+        "agents_used": [
+          "Trend Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_reopened_bugs"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0044,
+        "final_answer_snippet": "# Reopened Bugs Analysis  ## 1. Executive Summary  Found **1 reopened bugs** in active data.  ## 2. Problem Analysis  ##..."
+      },
+      {
+        "query_id": "eval-16-general-health-report",
+        "query": "Give me a complete engineering health report",
+        "category": "report",
+        "detected_intent": "REPORT",
+        "expected_intent": "GENERAL_REPORT",
+        "intent_correct": true,
+        "agents_used": [
+          "Bug Analyst",
+          "Risk Analyst",
+          "Trend Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_bug_metrics",
+          "get_component_risk",
+          "get_bug_trends"
+        ],
+        "tool_selection_correct": true,
+        "task_success": false,
+        "groundedness_score": 0.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.01,
+        "final_answer_snippet": "Orchestrated analysis for query: 'Give me a complete engineering health report' - Bug Summary: Total 22 bugs, 7 open, 7 ..."
+      },
+      {
+        "query_id": "eval-17-nonexistent-bug",
+        "query": "Tell me about bug NONEXISTENT-99999",
+        "category": "missing_bug",
+        "detected_intent": "SPECIFIC_BUG",
+        "expected_intent": "SPECIFIC_BUG",
+        "intent_correct": true,
+        "agents_used": [
+          "Bug Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_bug"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 0.5,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0046,
+        "final_answer_snippet": "I couldn't find a bug matching 'NONEXISTENT-99999'. Please provide a bug ID or more details."
+      },
+      {
+        "query_id": "eval-18-missing-root-cause",
+        "query": "What is the exact confirmed root cause of BP-999?",
+        "category": "grounding",
+        "detected_intent": "SPECIFIC_BUG",
+        "expected_intent": "SPECIFIC_BUG",
+        "intent_correct": true,
+        "agents_used": [
+          "Bug Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_bug"
+        ],
+        "tool_selection_correct": true,
+        "task_success": true,
+        "groundedness_score": 1.0,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CORRECT",
+        "reflection_quality_score": 0.55,
+        "latency_seconds": 0.0046,
+        "final_answer_snippet": "# Bug Analysis Report \u2014 BP-999  ## 1. Executive Summary  **BP-999** is an **open, critical-severity** issue in the **Aut..."
+      },
+      {
+        "query_id": "eval-19-missing-historical-data",
+        "query": "What was the bug count 3 years ago?",
+        "category": "grounding",
+        "detected_intent": "REPORT",
+        "expected_intent": "TREND",
+        "intent_correct": false,
+        "agents_used": [
+          "Bug Analyst",
+          "Risk Analyst",
+          "Trend Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_bug_metrics",
+          "get_component_risk",
+          "get_bug_trends"
+        ],
+        "tool_selection_correct": true,
+        "task_success": false,
+        "groundedness_score": 0.5,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0106,
+        "final_answer_snippet": "Orchestrated analysis for query: 'What was the bug count 3 years ago?' - Bug Summary: Total 22 bugs, 7 open, 7 critical/..."
+      },
+      {
+        "query_id": "eval-20-complex-multi-goal",
+        "query": "Analyze Authentication bugs and tell me whether they are becoming a release risk.",
+        "category": "complex",
+        "detected_intent": "RELEASE_RISK",
+        "expected_intent": "RISK",
+        "intent_correct": true,
+        "agents_used": [
+          "Risk Analyst"
+        ],
+        "agent_routing_correct": true,
+        "tools_used": [
+          "get_release_risk"
+        ],
+        "tool_selection_correct": false,
+        "task_success": true,
+        "groundedness_score": 0.5,
+        "hallucination_detected": false,
+        "unsupported_claims": [],
+        "reflection_verdict": "CONFIRM",
+        "reflection_quality_score": 1.0,
+        "latency_seconds": 0.0037,
+        "final_answer_snippet": "# Release Risk Evaluation  ## 1. Executive Summary  Evaluated release safety and risk exposure across active components...."
+      }
+    ]
+  },
+  "load_test_evaluation": {
+    "test_queries": [
+      "What is the status of BP-999?",
+      "How many bugs are open?",
+      "What is the current bug trend?",
+      "Which component has the highest risk?",
+      "Search for all open billing bugs"
+    ],
+    "concurrency_results": [
+      {
+        "concurrency": 1,
+        "total_requests": 2,
+        "successful_requests": 2,
+        "failed_requests": 0,
+        "error_rate": 0.0,
+        "duration_seconds": 0.029,
+        "throughput_rps": 68.74,
+        "p50_latency_seconds": 0.01,
+        "p95_latency_seconds": 0.0188,
+        "p99_latency_seconds": 0.0188,
+        "max_latency_seconds": 0.0188
+      },
+      {
+        "concurrency": 5,
+        "total_requests": 10,
+        "successful_requests": 10,
+        "failed_requests": 0,
+        "error_rate": 0.0,
+        "duration_seconds": 0.059,
+        "throughput_rps": 168.62,
+        "p50_latency_seconds": 0.0211,
+        "p95_latency_seconds": 0.0515,
+        "p99_latency_seconds": 0.0515,
+        "max_latency_seconds": 0.0515
+      },
+      {
+        "concurrency": 10,
+        "total_requests": 20,
+        "successful_requests": 20,
+        "failed_requests": 0,
+        "error_rate": 0.0,
+        "duration_seconds": 0.101,
+        "throughput_rps": 198.08,
+        "p50_latency_seconds": 0.0447,
+        "p95_latency_seconds": 0.0889,
+        "p99_latency_seconds": 0.091,
+        "max_latency_seconds": 0.091
+      },
+      {
+        "concurrency": 25,
+        "total_requests": 50,
+        "successful_requests": 50,
+        "failed_requests": 0,
+        "error_rate": 0.0,
+        "duration_seconds": 0.255,
+        "throughput_rps": 195.88,
+        "p50_latency_seconds": 0.1043,
+        "p95_latency_seconds": 0.1999,
+        "p99_latency_seconds": 0.2077,
+        "max_latency_seconds": 0.2077
+      },
+      {
+        "concurrency": 50,
+        "total_requests": 100,
+        "successful_requests": 100,
+        "failed_requests": 0,
+        "error_rate": 0.0,
+        "duration_seconds": 0.468,
+        "throughput_rps": 213.49,
+        "p50_latency_seconds": 0.2199,
+        "p95_latency_seconds": 0.3648,
+        "p99_latency_seconds": 0.4276,
+        "max_latency_seconds": 0.4529
+      }
+    ]
+  }
+}
