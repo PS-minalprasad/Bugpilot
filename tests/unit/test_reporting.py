@@ -36,7 +36,7 @@ class TestReportAndReflectionAgents:
             )
 
             assert isinstance(report, AnalysisReport)
-            assert report.data_source in ["PostgreSQL", "Synthetic Demo Data"]
+            assert report.data_source in ["SQLite", "PostgreSQL", "Synthetic Demo Data"]
             assert len(report.all_sections) == 5
             assert report.has_all_sections is True
 
@@ -44,6 +44,62 @@ class TestReportAndReflectionAgents:
             assert "Total Bugs Analyzed" in report.bug_analysis.content
             assert report.executive_summary.content is not None
             assert report.risk_assessment.content is not None
+
+    def test_report_agent_gemini_success(self, monkeypatch):
+        """Verify ReportAgent incorporates Gemini analysis when available."""
+        from unittest.mock import patch
+        from backend.config import settings
+
+        mock_ai_text = "Technical analysis indicates Authentication component is experiencing token refresh race conditions."
+        with patch.object(settings, "GEMINI_API_KEY", "mock-key-123"):
+            with patch("backend.llm.gemini_client.generate_analysis", return_value=mock_ai_text):
+                report_agent = ReportAgent()
+                report = report_agent.generate_report(
+                    query="Analyze auth issues",
+                    bug_evidence={"summary": {"total_bugs": 5, "open_bugs": 2, "critical_high_bugs": 1}},
+                    risk_evidence={"component_risks": [{"name": "Authentication", "risk_score": 85, "reasons": ["High severity"]}]},
+                )
+
+                assert isinstance(report, AnalysisReport)
+                assert "AI Evidence-Grounded Synthesis" in report.executive_summary.content
+                assert "Authentication" in report.executive_summary.content
+                assert report.raw_insights.get("ai_analysis") == mock_ai_text
+                assert report.raw_insights.get("llm_generated") is True
+
+    def test_report_agent_gemini_unavailable_fallback(self):
+        """Verify ReportAgent gracefully falls back to deterministic template when Gemini returns None."""
+        from unittest.mock import patch
+        from backend.config import settings
+
+        with patch.object(settings, "GEMINI_API_KEY", ""):
+            report_agent = ReportAgent()
+            report = report_agent.generate_report(
+                query="Analyze general bug status",
+                bug_evidence={"summary": {"total_bugs": 12, "open_bugs": 4, "critical_high_bugs": 2}},
+                trend_evidence={"creation_resolution_trends": [{"period": "2026-01", "created": 10, "resolved": 8}]},
+                risk_evidence={"component_risks": [{"name": "Database", "risk_score": 70, "reasons": ["Aging"]}]},
+            )
+
+            assert isinstance(report, AnalysisReport)
+            assert report.has_all_sections is True
+            assert "System analyzed **12** total bugs" in report.executive_summary.content
+            assert "Database" in report.executive_summary.content
+            assert "ai_analysis" not in report.raw_insights
+
+    def test_report_agent_insufficient_evidence(self):
+        """Verify ReportAgent properly handles empty evidence without hallucination."""
+        report_agent = ReportAgent()
+        report = report_agent.generate_report(
+            query="Unknown query with no data",
+            bug_evidence={},
+            trend_evidence={},
+            risk_evidence={},
+        )
+
+        assert isinstance(report, AnalysisReport)
+        assert "Insufficient data to determine detailed bug analysis" in report.executive_summary.content
+        assert report.bug_section if hasattr(report, "bug_section") else report.bug_analysis.is_empty is True
+        assert report.raw_insights.get("ai_analysis") is None
 
     @pytest.mark.asyncio
     async def test_reflection_agent_confirm_valid_answer(self):

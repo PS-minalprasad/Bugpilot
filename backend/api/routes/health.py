@@ -47,7 +47,7 @@ async def health() -> HealthResponse:
         version=settings.APP_VERSION,
         env=settings.ENV,
         timestamp=datetime.utcnow().isoformat() + "Z",
-        data_source=settings.DATA_LABEL,
+        data_source=settings.data_label,
     )
 
 
@@ -84,7 +84,7 @@ async def readiness() -> ReadinessResponse:
         "data_provider": {
             "status": "ready",
             "mode": settings.PROVIDER_MODE,
-            "detail": f"Active provider: {settings.DATA_LABEL}",
+            "detail": f"Active provider: {settings.data_label}",
         },
         "mcp_server": {
             "status": "ready",

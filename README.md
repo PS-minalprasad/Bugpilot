@@ -1,7 +1,7 @@
 # BugPilot
 ### AI-Powered Engineering Bug Intelligence Agent
 
-> **Data Architecture**: BugPilot runs on a persistent, multi-tenant **PostgreSQL / SQLite** database path by default (`PROVIDER_MODE=postgres`). All issue creation, status updates, sprint assignments, and status transitions dynamically flow through analytics, MCP tools, and agent workflows in real time. Synthetic demo data is also supported via `PROVIDER_MODE=synthetic`, and real Jira Cloud instances can be connected via Atlassian OAuth (`PROVIDER_MODE=jira_cloud`).
+> **Data Architecture**: BugPilot runs on a persistent, multi-tenant **SQL database path by default** (`PROVIDER_MODE=sql`, storing data in local SQLite `sqlite:///./bugpilot.db` with zero external setup required). Point `DATABASE_URL` at a live PostgreSQL server for production deployments (`PROVIDER_MODE=postgres`). All issue creation, status updates, sprint assignments, and status transitions dynamically flow through analytics, MCP tools, and agent workflows in real time. Synthetic demo data is also supported via `PROVIDER_MODE=synthetic`, and real Jira Cloud instances can be connected via Atlassian OAuth (`PROVIDER_MODE=jira_cloud`).
 
 ---
 
@@ -30,7 +30,7 @@ Analyst   Analyst   Analyst
 PostgresProvider    SyntheticProvider
 (Live DB default)   (Demo Mode)
    │
-PostgreSQL / SQLite DB
+SQL Database (SQLite / PostgreSQL)
 (issues, sprints, users, orgs)
 ```
 
@@ -45,15 +45,17 @@ Agents never import `providers/` or `backend/database` directly — verified via
 
 ---
 
-## Data Providers & Live Dynamic Path
+## Data Providers & Storage Modes
 
 | Provider | Mode Flag | Data Label | Storage | Features |
 |----------|-----------|------------|---------|----------|
-| **`PostgresProvider` (Default)** | `postgres` | `PostgreSQL` / `SQLite` | Persistent SQLite/PostgreSQL | Fully dynamic live user CRUD, sprint tracking (`sprint_id`), status transition reopen tracking (`reopen_count`), and real-time agent/MCP intelligence. |
+| **`PostgresProvider` (Default)** | `sql` / `postgres` | `SQLite` / `PostgreSQL` | Persistent SQLite (zero setup) / PostgreSQL | Fully dynamic live user CRUD, sprint tracking (`sprint_id`), status transition reopen tracking (`reopen_count`), and real-time agent/MCP intelligence. |
 | **`SyntheticProvider`** | `synthetic` | `Synthetic Demo Data` | In-memory generated data | Instant demonstration mode with 1000 generated bugs across 14 sprints for offline testing. |
 | **`JiraCloudProvider`** | `jira_cloud` | `Jira Cloud` | Atlassian Cloud | Live Jira issues via OAuth 2.0 (3LO) connection. |
 
 ### Live-Data Features
+- **Zero-Config Local Database**: Automatically provisions and manages local SQLite database (`bugpilot.db`) on startup with zero external database dependencies.
+- **Production PostgreSQL Ready**: Set `DATABASE_URL=postgresql://user:pass@host:port/dbname` to scale out in production.
 - **Sprint Management**: Live sprints stored in database (`SprintModel` / `sprints` table) per tenant (`organization_id`).
 - **Sprint Linkage**: Issues link to sprints via `sprint_id`. MCP metric tools filter dynamically by `sprint_id`.
 - **Reopen Tracking**: Automatic status transition detection (from `Resolved`/`Closed` to `Open`/`In Progress`) increments `reopen_count` on `IssueModel` and updates `reopened_count` in domain analytics.
@@ -119,7 +121,7 @@ Run the MCP Server standalone over `stdio` transport:
 | POST | `/api/v1/auth/login`, `/auth/register` | Credential auth |
 | GET | `/api/v1/auth/me`, `/auth/roles` | Current user, available RBAC roles |
 | GET/POST | `/api/v1/auth/atlassian/login`, `/callback`, `/status`, `/logout` | Atlassian OAuth 2.0 (3LO) flow |
-| GET/POST/PUT/DELETE | `/api/v1/issues[/{issue_id}]` | Issue CRUD (Postgres/SQLite-backed) |
+| GET/POST/PUT/DELETE | `/api/v1/issues[/{issue_id}]` | Issue CRUD (SQLite/PostgreSQL-backed) |
 | GET/POST | `/api/v1/auth/jira/authorize`, `/callback` | Legacy Jira connect flow |
 
 ---
@@ -155,11 +157,11 @@ pip install -r requirements.txt
 ```bash
 cp .env.example .env   # Windows: copy .env.example .env
 ```
-Defaults work out of the box with local SQLite and the postgres provider. Set `GEMINI_API_KEY` to enable live LLM analysis calls.
+Defaults work out of the box with zero external setup using the local SQLite database (`bugpilot.db`). Set `GEMINI_API_KEY` to enable live LLM analysis calls.
 
-### 4. Run Backend Test Suite (287 Tests)
+### 4. Run Backend Test Suite
 ```bash
-pytest -q
+pytest -m "not llm" -q
 ```
 
 ### 5. Build and Run Frontend

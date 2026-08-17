@@ -39,7 +39,7 @@ class TestHealthEndpoint:
     async def test_health_data_source(self, client):
         response = await client.get("/api/health")
         body = response.json()
-        assert body["data_source"] == "PostgreSQL"
+        assert body["data_source"] in ["SQLite", "PostgreSQL"]
 
     @pytest.mark.asyncio
     async def test_health_version_present(self, client):

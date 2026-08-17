@@ -10,7 +10,7 @@ def get_data_provider(mode: Optional[str] = None, org_id: Optional[str] = None) 
     """
     Factory function returning the active DataProvider based on mode.
     Modes:
-      - "postgres" (default): PostgresProvider reading real issues from PostgreSQL
+      - "sql" / "database" / "postgres" / "sqlite" (default): Database provider reading real issues from SQLite/PostgreSQL
       - "synthetic": SyntheticProvider with Synthetic Demo Data
     """
     from backend.config import settings

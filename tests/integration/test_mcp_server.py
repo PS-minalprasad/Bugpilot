@@ -49,7 +49,7 @@ async def test_mcp_server_full_suite():
             assert not res_search.is_error
             data_search = json.loads(res_search.content[0].text)
             assert "count" in data_search
-            assert data_search["data_source"] in ["PostgreSQL", "Synthetic Demo Data"]
+            assert data_search["data_source"] in ["SQLite", "PostgreSQL", "Synthetic Demo Data"]
 
             # 3. get_bug (existing & missing)
             res_bug_exist = await session.call_tool("get_bug", arguments={"bug_id": "API-1"})

@@ -76,8 +76,9 @@ async def generate_analysis(evidence: Any, question: str) -> Optional[str]:
         }
     }
 
+    call_timeout = min(getattr(settings, "LLM_TIMEOUT_SECONDS", 5.0), 5.0)
     try:
-        async with httpx.AsyncClient(timeout=settings.LLM_TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(call_timeout, connect=3.0)) as client:
             resp = await client.post(url, json=payload)
             if resp.status_code != 200:
                 logger.warning(f"Gemini API returned status {resp.status_code}: {resp.text[:200]}")
@@ -96,8 +97,8 @@ async def generate_analysis(evidence: Any, question: str) -> Optional[str]:
             text = parts[0].get("text", "").strip()
             return text if text else None
 
-    except httpx.TimeoutException:
-        logger.warning(f"Gemini API timed out after {settings.LLM_TIMEOUT_SECONDS}s.")
+    except (httpx.TimeoutException, TimeoutError):
+        logger.warning(f"Gemini API timed out after {call_timeout}s.")
         return None
     except Exception as err:
         logger.warning(f"Gemini API call failed: {err}")

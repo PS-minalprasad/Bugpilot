@@ -45,7 +45,8 @@ class TestSettingsDefaults:
         assert settings.LOG_LEVEL == settings.LOG_LEVEL.upper()
 
     def test_data_label(self):
-        assert settings.DATA_LABEL == "PostgreSQL"
+        assert settings.DATA_LABEL in ["SQLite", "PostgreSQL"]
+        assert settings.data_label in ["SQLite", "PostgreSQL"]
 
     def test_port_is_int(self):
         assert isinstance(settings.PORT, int)

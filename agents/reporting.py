@@ -30,6 +30,67 @@ class ReportAgent:
     def __init__(self) -> None:
         self.name = "Report Agent"
 
+    def _invoke_gemini_analysis(
+        self,
+        query: str,
+        bug_evidence: Dict[str, Any],
+        trend_evidence: Dict[str, Any],
+        risk_evidence: Dict[str, Any],
+    ) -> Optional[str]:
+        """Calls Gemini generate_analysis when sufficient evidence is available, handling event loop context."""
+        has_sufficient_evidence = bool(
+            bug_evidence.get("summary")
+            or bug_evidence.get("metrics")
+            or bug_evidence.get("bug")
+            or bug_evidence.get("bugs")
+            or trend_evidence.get("creation_resolution_trends")
+            or trend_evidence.get("sprint_trends")
+            or trend_evidence.get("trends")
+            or risk_evidence.get("component_risks")
+            or risk_evidence.get("release_risks")
+            or risk_evidence.get("aging_bugs")
+        )
+        if not has_sufficient_evidence:
+            return None
+
+        from backend.llm.gemini_client import generate_analysis
+        from backend.config import settings
+
+        if not settings.GEMINI_API_KEY:
+            return None
+
+        combined_evidence = {
+            "bug_evidence": bug_evidence,
+            "trend_evidence": trend_evidence,
+            "risk_evidence": risk_evidence,
+        }
+        gemini_prompt = (
+            f"Synthesize an evidence-grounded engineering intelligence report for the query: '{query}'.\n\n"
+            f"Instructions:\n"
+            f"1. Provide a technical analysis of the bugs, trends, and risk hotspots based strictly on the retrieved data.\n"
+            f"2. State the probable root cause ONLY when explicitly supported by the evidence; otherwise write: '**The available data does not provide enough evidence to confirm the underlying root cause.**'\n"
+            f"3. State the business impact ONLY when explicitly supported by the evidence; otherwise write: '> **The exact business impact cannot be determined from the available data.**'\n"
+            f"4. Provide recommended fixes and actionable investigation steps supported by the data.\n"
+            f"5. Do NOT invent or extrapolate any metrics, root causes, or impacts not present in the evidence."
+        )
+
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(lambda: asyncio.run(generate_analysis(combined_evidence, gemini_prompt)))
+                    return future.result()
+            else:
+                return asyncio.run(generate_analysis(combined_evidence, gemini_prompt))
+        except Exception as err:
+            logger.warning(f"ReportAgent Gemini analysis fallback: {err}")
+            return None
+
     def generate_report(
         self,
         query: str,
@@ -48,6 +109,9 @@ class ReportAgent:
         t_ev = trend_evidence or {}
         r_ev = risk_evidence or {}
 
+        from backend.config import settings
+        data_source_label = b_ev.get("data_source") or t_ev.get("data_source") or r_ev.get("data_source") or settings.data_label
+
         # 1. Bug Analysis Section
         summary_m = b_ev.get("summary", {}) or b_ev.get("metrics", {}).get("summary", {})
         total_bugs = summary_m.get("total_bugs", 0)
@@ -61,7 +125,7 @@ class ReportAgent:
             f"- **Open / Unresolved Bugs**: {open_bugs}\n"
             f"- **Resolved Bugs**: {resolved_bugs}\n"
             f"- **Critical & High Open Bugs**: {crit_high}\n"
-            f"- **Data Source**: Synthetic Demo Data"
+            f"- **Data Source**: {data_source_label}"
         )
         bug_section = ReportSection(
             title="Bug Analysis",
@@ -110,6 +174,9 @@ class ReportAgent:
             is_empty=not bool(comp_r or rel_r)
         )
 
+        # Try Gemini AI analysis if sufficient evidence is available
+        ai_analysis = self._invoke_gemini_analysis(query, b_ev, t_ev, r_ev)
+
         # 4. Executive Summary Section
         if not summary_m and not comp_r and not trends_m:
             exec_content = (
@@ -117,11 +184,16 @@ class ReportAgent:
                 f"Insufficient data to determine detailed bug analysis. No relevant MCP tool observations were retrieved for this query."
             )
         else:
-            exec_content = (
+            base_exec = (
                 f"Executive Summary for Query: *\"{query}\"*\n\n"
                 f"System analyzed **{total_bugs}** total bugs (**{open_bugs}** open, **{crit_high}** critical/high severity). "
                 f"Highest risk is concentrated in component **{top_comp.get('name', 'N/A')}** (Risk Score: {top_comp.get('risk_score', 0)}/100)."
             )
+            if ai_analysis:
+                exec_content = f"{base_exec}\n\n### AI Evidence-Grounded Synthesis\n{ai_analysis}"
+            else:
+                exec_content = base_exec
+
         exec_section = ReportSection(
             title="Executive Summary",
             content=exec_content,
@@ -143,17 +215,22 @@ class ReportAgent:
             is_empty=False
         )
 
+        raw_insights: Dict[str, Any] = {"bug": b_ev, "trend": t_ev, "risk": r_ev}
+        if ai_analysis:
+            raw_insights["ai_analysis"] = ai_analysis
+            raw_insights["llm_generated"] = True
+
         return AnalysisReport(
             report_id=report_id,
             analysis_id=analysis_id,
             generated_at=datetime.utcnow(),
-            data_source="Synthetic Demo Data",
+            data_source=data_source_label,
             executive_summary=exec_section,
             bug_analysis=bug_section,
             trend_analysis=trend_section,
             risk_assessment=risk_section,
             recommendations=recs_section,
-            raw_insights={"bug": b_ev, "trend": t_ev, "risk": r_ev}
+            raw_insights=raw_insights,
         )
 
 

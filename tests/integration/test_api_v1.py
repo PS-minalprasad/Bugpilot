@@ -34,7 +34,7 @@ class TestFastAPIBackend:
         data = res.json()
         assert data["status"] == "ok"
         assert data["app"] == "BugPilot"
-        assert data["data_source"] in ["PostgreSQL", "Synthetic Demo Data"]
+        assert data["data_source"] in ["SQLite", "PostgreSQL", "Synthetic Demo Data"]
 
     @pytest.mark.asyncio
     async def test_get_agents_endpoint(self, api_client):

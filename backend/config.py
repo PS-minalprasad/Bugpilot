@@ -84,8 +84,8 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # Data & Providers (Phase 14)
     # -------------------------------------------------------------------------
-    PROVIDER_MODE: str = "postgres"  # "postgres" | "synthetic"
-    DATA_LABEL: str = "PostgreSQL"
+    PROVIDER_MODE: str = "sql"  # "sql" (default local SQLite) | "postgres" | "sqlite" | "synthetic"
+    DATA_LABEL: str = "SQLite"
 
     # -------------------------------------------------------------------------
     # LLM (Phase 6)
@@ -135,9 +135,16 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     @property
     def data_label(self) -> str:
-        """Return the database data source label."""
-        if self.DATABASE_URL.startswith("sqlite") and self.DATA_LABEL.lower() == "sqlite":
+        """
+        Return the human-readable database data source label.
+        Defaults to 'SQLite' for zero-setup local execution (DATABASE_URL=sqlite:///...).
+        Switches to 'PostgreSQL' when DATABASE_URL points to a PostgreSQL instance
+        or when explicitly configured.
+        """
+        if self.DATABASE_URL.startswith("sqlite"):
             return "SQLite"
+        if "postgres" in self.DATABASE_URL.lower() or self.PROVIDER_MODE == "postgres":
+            return "PostgreSQL"
         return self.DATA_LABEL
 
     @property

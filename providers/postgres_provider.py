@@ -1,8 +1,8 @@
 """
-BugPilot — PostgresProvider
-============================
-Implements DataProvider using persistent PostgreSQL database models (IssueModel).
-All issues carry data_source = "PostgreSQL".
+BugPilot — PostgresProvider / SQL Database Provider
+===================================================
+Implements DataProvider using persistent SQL database models (IssueModel).
+Works seamlessly with SQLite (default local zero-setup) and PostgreSQL.
 """
 
 from __future__ import annotations

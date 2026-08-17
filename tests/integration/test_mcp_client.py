@@ -76,7 +76,7 @@ class TestMCPClientIntegration:
             assert isinstance(res, dict)
             assert res.get("found") is True
             assert res.get("bug", {}).get("id") == "API-1"
-            assert res.get("data_source") in ["PostgreSQL", "Synthetic Demo Data"]
+            assert res.get("data_source") in ["SQLite", "PostgreSQL", "Synthetic Demo Data"]
 
             # Missing bug
             res_missing = await client.call_tool("get_bug", {"bug_id": "NOTFOUND-999", "org_id": "org-acme"})
@@ -92,8 +92,8 @@ class TestMCPClientIntegration:
             assert isinstance(res, dict)
             summary = res.get("summary", {})
             assert summary.get("total_bugs") >= 0
-            assert summary.get("data_source") in ["PostgreSQL", "Synthetic Demo Data"]
-            assert res.get("data_source") in ["PostgreSQL", "Synthetic Demo Data"]
+            assert summary.get("data_source") in ["SQLite", "PostgreSQL", "Synthetic Demo Data"]
+            assert res.get("data_source") in ["SQLite", "PostgreSQL", "Synthetic Demo Data"]
 
     @pytest.mark.asyncio
     async def test_get_component_risk_invocation(self):
@@ -103,7 +103,7 @@ class TestMCPClientIntegration:
             assert isinstance(res, dict)
             assert "component_risks" in res
             assert res.get("count", 0) > 0
-            assert res.get("data_source") in ["PostgreSQL", "Synthetic Demo Data"]
+            assert res.get("data_source") in ["SQLite", "PostgreSQL", "Synthetic Demo Data"]
 
     @pytest.mark.asyncio
     async def test_invalid_tool_handling(self):

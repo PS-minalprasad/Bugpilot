@@ -40,7 +40,7 @@ class TestSpecialistAgentsIntegration:
             metrics_summary = result.supporting_evidence.get("metrics", {}).get("summary", {})
             assert metrics_summary.get("total_bugs") >= 0
             assert metrics_summary.get("open_bugs") >= 0
-            assert metrics_summary.get("data_source") in ["PostgreSQL", "Synthetic Demo Data"]
+            assert metrics_summary.get("data_source") in ["SQLite", "PostgreSQL", "Synthetic Demo Data"]
             assert "Total Bugs analyzed:" in result.findings
 
     @pytest.mark.asyncio

@@ -58,7 +58,7 @@ class TestE2ECompleteWorkflow:
         data = res.json()
         assert data["status"] == "ok"
         assert data["app"] == "BugPilot"
-        assert data["data_source"] == "PostgreSQL"
+        assert data["data_source"] in ["SQLite", "PostgreSQL"]
 
     # -------------------------------------------------------------------------
     # 2. MCP Server Startup
