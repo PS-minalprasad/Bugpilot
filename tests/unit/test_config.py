@@ -86,8 +86,8 @@ class TestSettingsValidation:
 class TestNoHardcodedSecrets:
     """Ensure no secrets are hardcoded in config defaults."""
 
-    def test_gemini_api_key_default_is_empty(self):
+    def test_groq_api_key_default_is_empty(self):
         s = Settings(_env_file=None)
-        assert s.GEMINI_API_KEY == "", (
-            "GEMINI_API_KEY must default to empty string — never hardcode a key"
+        assert s.GROQ_API_KEY == "", (
+            "GROQ_API_KEY must default to empty string — never hardcode a key"
         )

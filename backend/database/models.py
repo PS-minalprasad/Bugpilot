@@ -81,6 +81,20 @@ class IssueModel(Base):
     status = Column(String(64), nullable=False, default="Open", index=True)
     priority = Column(String(64), nullable=False, default="Medium", index=True)
     severity = Column(String(64), nullable=False, default="Medium", index=True)
+    resolution = Column(String(64), nullable=True)
+    environment = Column(String(64), nullable=True, default="production")
+    affected_version = Column(String(64), nullable=True)
+    fix_version = Column(String(64), nullable=True)
+
+    # Deep Evidence & Root Cause
+    root_cause = Column(Text, nullable=True)
+    business_impact = Column(Text, nullable=True)
+    steps_to_reproduce = Column(Text, nullable=True)
+    expected_behavior = Column(Text, nullable=True)
+    actual_behavior = Column(Text, nullable=True)
+    comments_json = Column(Text, nullable=True, default="[]")
+    linked_issues_json = Column(Text, nullable=True, default="[]")
+
     project = Column(String(64), nullable=False, index=True)
     component = Column(String(64), nullable=False, index=True)
     sprint_id = Column(String(64), ForeignKey("sprints.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -88,9 +102,11 @@ class IssueModel(Base):
     assignee = Column(String(255), nullable=True)
     reporter = Column(String(255), nullable=True)
     organization_id = Column(String(64), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     organization = relationship("OrganizationModel")
     sprint = relationship("SprintModel")
+
 

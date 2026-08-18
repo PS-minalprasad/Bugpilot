@@ -373,7 +373,8 @@ export const App: React.FC = () => {
     setIsChatLoading(true);
 
     try {
-      const response = await sendChatMessage(query);
+      const { token, orgId } = getAuthCredentials();
+      const response = await sendChatMessage(query, token, orgId);
       const assistantMsg: ChatMessage = {
         id: `assistant-${Date.now()}`,
         sender: 'assistant',
@@ -386,7 +387,6 @@ export const App: React.FC = () => {
       setExecutionLogs((prev) => [response, ...prev]);
       if (!selectedExecution) setSelectedExecution(response);
 
-      const { token, orgId } = getAuthCredentials();
       fetchDashboardMetrics(token, orgId, projectFilter, componentFilter).then(setMetrics).catch(console.error);
     } catch (err: any) {
       setChatError(err.message || 'Error communicating with BugPilot agent.');
@@ -819,14 +819,28 @@ export const App: React.FC = () => {
                     {msg.sender === 'assistant' && msg.responseDetails && (
                       <div className="chat-meta" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                         <div style={{ fontSize: '0.75rem', color: '#38bdf8', marginBottom: '0.4rem', fontWeight: 600 }}>
-                          ⚡ Real Execution Trace (ID: {msg.responseDetails.execution_id} | Req: {msg.responseDetails.request_id})
+                          ⚡ ReAct Agent Trace (ID: {msg.responseDetails.execution_id} | Req: {msg.responseDetails.request_id})
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.75rem', color: '#d1d5db' }}>
-                          <div>1. Query Received → Orchestrator Agent initialized</div>
-                          <div>2. Agents Invoked → {msg.responseDetails.agents_used.join(', ')}</div>
-                          <div>3. MCP Tools Executed → {msg.responseDetails.tools_used.join(', ')}</div>
-                          <div>4. Reflection Agent Audit → Verdict: <strong style={{ color: msg.responseDetails.reflection.verdict === 'CONFIRM' ? '#10b981' : '#f59e0b' }}>{msg.responseDetails.reflection.verdict}</strong> (Quality Score: {msg.responseDetails.reflection.quality_score})</div>
-                          <div>5. Final Response Rendered in {msg.responseDetails.elapsed_seconds}s</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.75rem', color: '#d1d5db' }}>
+                          <div><strong>Goal Analysis:</strong> Orchestrator dynamic MCP discovery & iterative reasoning loop</div>
+                          {msg.responseDetails.execution_steps && msg.responseDetails.execution_steps.length > 0 ? (
+                            msg.responseDetails.execution_steps.map((st, sIdx) => (
+                              <div key={sIdx} style={{ paddingLeft: '0.5rem', borderLeft: '2px solid #38bdf8', marginTop: '0.2rem' }}>
+                                <div style={{ color: '#f3f4f6' }}>
+                                  <strong>Step {st.step_number} [Decision → {st.tool_name === 'DELEGATE' ? 'DELEGATE' : 'CALL_TOOL'}]:</strong> {st.agent_name} executed <code>{st.tool_name}</code> ({st.duration_seconds}s)
+                                </div>
+                                <div style={{ color: '#9ca3af', fontSize: '0.7rem' }}>↳ Observation: {st.result_summary}</div>
+                              </div>
+                            ))
+                          ) : (
+                            <>
+                              <div>Agents Invoked → {msg.responseDetails.agents_used.join(', ')}</div>
+                              <div>MCP Tools Executed → {msg.responseDetails.tools_used.join(', ')}</div>
+                            </>
+                          )}
+                          <div style={{ marginTop: '0.3rem', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '0.3rem' }}>
+                            <strong>Decision [FINISH] → Reflection Audit:</strong> Verdict: <span style={{ color: msg.responseDetails.reflection.verdict === 'CONFIRM' ? '#10b981' : '#f59e0b', fontWeight: 700 }}>{msg.responseDetails.reflection.verdict}</span> (Quality: {msg.responseDetails.reflection.quality_score}) in {msg.responseDetails.elapsed_seconds}s
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1035,7 +1049,7 @@ export const App: React.FC = () => {
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <strong>Active Provider:</strong>
                 <span className="risk-badge" style={{ background: 'rgba(16,185,129,0.2)', color: '#10b981', fontSize: '0.9rem' }}>
-                  ● PostgreSQL Database (Source of Truth)
+                  ● {metrics?.data_source || health?.data_source || 'SQLite'} Database (Source of Truth)
                 </span>
               </div>
 
@@ -1043,7 +1057,7 @@ export const App: React.FC = () => {
                 <div className="kpi-card">
                   <span className="kpi-title">Data Source Engine</span>
                   <span className="kpi-value" style={{ fontSize: '1.2rem', color: '#10b981' }}>
-                    POSTGRESQL
+                    {(metrics?.data_source || health?.data_source || 'SQLite').toUpperCase()}
                   </span>
                   <span className="kpi-subtitle">
                     Live Relational Persistence
@@ -1052,7 +1066,7 @@ export const App: React.FC = () => {
                 <div className="kpi-card">
                   <span className="kpi-title">Available Database Issues</span>
                   <span className="kpi-value">{issues.length > 0 ? issues.length : rawSummary.total_bugs !== undefined ? rawSummary.total_bugs : '—'}</span>
-                  <span className="kpi-subtitle">PostgreSQL Source of Truth</span>
+                  <span className="kpi-subtitle">{metrics?.data_source || health?.data_source || 'SQLite'} Source of Truth</span>
                 </div>
                 <div className="kpi-card">
                   <span className="kpi-title">Active Projects</span>
@@ -1070,10 +1084,10 @@ export const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* Real PostgreSQL Issues Table */}
+              {/* Real Database Issues Table */}
               <div className="dashboard-panel" style={{ marginTop: '1.5rem' }}>
                 <div className="panel-header">
-                  <span className="panel-title">PostgreSQL Persistent Issues ({issues.length})</span>
+                  <span className="panel-title">{metrics?.data_source || health?.data_source || 'SQLite'} Persistent Issues ({issues.length})</span>
                   {canCreate && (
                     <button
                       onClick={openCreateModal}
@@ -1084,7 +1098,7 @@ export const App: React.FC = () => {
                   )}
                 </div>
                 {issues.length === 0 ? (
-                  <p style={{ color: '#9ca3af', padding: '1rem 0' }}>No issues found in PostgreSQL.{canCreate ? ' Click ➕ Add Bug to create one.' : ''}</p>
+                  <p style={{ color: '#9ca3af', padding: '1rem 0' }}>No issues found in {metrics?.data_source || health?.data_source || 'SQLite'}.{canCreate ? ' Click ➕ Add Bug to create one.' : ''}</p>
                 ) : (
                   <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
@@ -1209,6 +1223,22 @@ export const App: React.FC = () => {
                     <div><strong style={{ color: '#9ca3af' }}>Request ID:</strong> {selectedExecution.request_id}</div>
                     <div><strong style={{ color: '#9ca3af' }}>Agents Used:</strong> {selectedExecution.agents_used.join(', ')}</div>
                     <div><strong style={{ color: '#9ca3af' }}>MCP Tools Called:</strong> {selectedExecution.tools_used.join(', ')}</div>
+                    {selectedExecution.execution_steps && selectedExecution.execution_steps.length > 0 && (
+                      <div style={{ marginTop: '0.4rem' }}>
+                        <strong style={{ color: '#38bdf8' }}>ReAct Decision & Observation Trace:</strong>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.35rem' }}>
+                          {selectedExecution.execution_steps.map((st, sIdx) => (
+                            <div key={sIdx} style={{ background: '#111827', padding: '0.5rem 0.75rem', borderRadius: '4px', borderLeft: '3px solid #38bdf8' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#f3f4f6', fontWeight: 600, fontSize: '0.8rem' }}>
+                                <span>Step {st.step_number}: Decision [CALL_TOOL] → {st.agent_name} ({st.tool_name})</span>
+                                <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>{st.duration_seconds}s</span>
+                              </div>
+                              <div style={{ color: '#9ca3af', fontSize: '0.75rem', marginTop: '0.2rem' }}>Observation: {st.result_summary}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div><strong style={{ color: '#9ca3af' }}>Reflection Verdict:</strong> <span style={{ color: selectedExecution.reflection.verdict === 'CONFIRM' ? '#10b981' : '#f59e0b', fontWeight: 700 }}>{selectedExecution.reflection.verdict}</span></div>
                     <div><strong style={{ color: '#9ca3af' }}>Quality Score:</strong> {selectedExecution.reflection.quality_score}</div>
                     <div style={{ marginTop: '0.5rem', background: '#111827', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>

@@ -35,6 +35,8 @@ DEFAULT_ALLOWLIST = {
     "get_reopened_bugs",
     "get_component_risk",
     "get_release_risk",
+    "get_bug_history",
+    "get_related_bugs",
 }
 
 

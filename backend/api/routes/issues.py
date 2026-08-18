@@ -1,7 +1,7 @@
 """
 BugPilot — Issue CRUD Routes (Phase 28)
 ========================================
-Endpoints for creating, reading, updating, and deleting PostgreSQL issue records.
+Endpoints for creating, reading, updating, and deleting database issue records.
 Enforces multi-tenant isolation and role-based access control (RBAC).
 """
 
@@ -28,66 +28,89 @@ issues_router = APIRouter(prefix="/issues", tags=["issues"])
 class IssueCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=512, description="Issue title/summary")
     description: Optional[str] = Field(default="", max_length=5000)
-    status: str = Field(default="Open", description="Open, In Progress, Resolved, Closed")
-    priority: str = Field(default="Medium", description="Low, Medium, High, Critical")
-    severity: str = Field(default="Medium", description="Low, Medium, High, Critical")
-    project: str = Field(default="BugPilot", description="Project key or name")
-    component: str = Field(default="General", description="Component or service name")
-    sprint_id: Optional[str] = Field(default=None, description="Sprint ID")
-    assignee: Optional[str] = Field(default="Unassigned")
-    reporter: Optional[str] = Field(default="System")
+    status: Optional[str] = Field(default="Open", description="Status: Open, In Progress, Resolved, Closed")
+    priority: Optional[str] = Field(default="Medium", description="Priority: High, Medium, Low")
+    severity: Optional[str] = Field(default="Medium", description="Severity: Critical, High, Medium, Low")
+    project: Optional[str] = Field(default="BugPilot", description="Project name")
+    component: Optional[str] = Field(default="General", description="Component name")
+    assignee: Optional[str] = Field(default=None, description="Assignee name")
+    reporter: Optional[str] = Field(default=None, description="Reporter name")
+    environment: Optional[str] = Field(default="production", description="Environment")
+    steps_to_reproduce: Optional[str] = Field(default="", max_length=5000)
+    root_cause: Optional[str] = Field(default=None, max_length=5000)
+    business_impact: Optional[str] = Field(default=None, max_length=5000)
+    affected_version: Optional[str] = Field(default=None)
+    fix_version: Optional[str] = Field(default=None)
+    sprint_id: Optional[str] = Field(default=None)
 
 
 class IssueUpdateRequest(BaseModel):
-    title: Optional[str] = Field(default=None, max_length=512)
+    title: Optional[str] = Field(default=None, min_length=1, max_length=512)
     description: Optional[str] = Field(default=None, max_length=5000)
     status: Optional[str] = Field(default=None)
     priority: Optional[str] = Field(default=None)
     severity: Optional[str] = Field(default=None)
     project: Optional[str] = Field(default=None)
     component: Optional[str] = Field(default=None)
-    sprint_id: Optional[str] = Field(default=None)
     assignee: Optional[str] = Field(default=None)
-    reporter: Optional[str] = Field(default=None)
+    environment: Optional[str] = Field(default=None)
+    steps_to_reproduce: Optional[str] = Field(default=None)
+    root_cause: Optional[str] = Field(default=None)
+    business_impact: Optional[str] = Field(default=None)
+    affected_version: Optional[str] = Field(default=None)
+    fix_version: Optional[str] = Field(default=None)
+    sprint_id: Optional[str] = Field(default=None)
 
 
 class IssueResponse(BaseModel):
     id: str
     issue_key: str
     title: str
-    description: Optional[str]
+    description: str
     status: str
     priority: str
     severity: str
     project: str
     component: str
-    sprint_id: Optional[str] = None
-    reopen_count: int = 0
     assignee: Optional[str]
     reporter: Optional[str]
-    organization_id: str
+    environment: str
+    steps_to_reproduce: Optional[str]
+    root_cause: Optional[str]
+    business_impact: Optional[str]
+    affected_version: Optional[str]
+    fix_version: Optional[str]
+    sprint_id: Optional[str]
+    reopen_count: int
     created_at: str
     updated_at: str
+    organization_id: str
 
 
-def _to_issue_response(i: IssueModel) -> IssueResponse:
+def _to_issue_response(issue) -> IssueResponse:
     return IssueResponse(
-        id=i.id,
-        issue_key=i.issue_key,
-        title=i.title,
-        description=i.description,
-        status=i.status,
-        priority=i.priority,
-        severity=i.severity,
-        project=i.project,
-        component=i.component,
-        sprint_id=i.sprint_id,
-        reopen_count=getattr(i, "reopen_count", 0) or 0,
-        assignee=i.assignee,
-        reporter=i.reporter,
-        organization_id=i.organization_id,
-        created_at=i.created_at.isoformat() if i.created_at else "",
-        updated_at=i.updated_at.isoformat() if i.updated_at else "",
+        id=issue.id,
+        issue_key=issue.issue_key,
+        title=issue.title or "",
+        description=issue.description or "",
+        status=issue.status or "Open",
+        priority=issue.priority or "Medium",
+        severity=issue.severity or "Medium",
+        project=issue.project or "BugPilot",
+        component=issue.component or "General",
+        assignee=issue.assignee,
+        reporter=issue.reporter,
+        environment=issue.environment or "production",
+        steps_to_reproduce=issue.steps_to_reproduce,
+        root_cause=issue.root_cause,
+        business_impact=issue.business_impact,
+        affected_version=issue.affected_version,
+        fix_version=issue.fix_version,
+        sprint_id=issue.sprint_id,
+        reopen_count=issue.reopen_count or 0,
+        created_at=issue.created_at.isoformat() if issue.created_at else "",
+        updated_at=issue.updated_at.isoformat() if issue.updated_at else "",
+        organization_id=issue.organization_id or "org-acme",
     )
 
 
@@ -102,7 +125,7 @@ async def list_issues(
     offset: int = Query(default=0, ge=0),
     current_user: User = Depends(enforce_tenant_isolation),
 ):
-    """Retrieves list of PostgreSQL issues for the authenticated user's organization."""
+    """Retrieves list of issues for the authenticated user's organization."""
     issues = db_get_issues(
         org_id=current_user.org_id,
         project=project,
@@ -136,7 +159,7 @@ async def create_issue(
     req: IssueCreateRequest,
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.DEVELOPER, UserRole.ENGINEER])),
 ):
-    """Creates a new issue in PostgreSQL for the active organization."""
+    """Creates a new issue in the database for the active organization."""
     data = req.model_dump()
     data["reporter"] = req.reporter or current_user.email
     issue = db_create_issue(org_id=current_user.org_id, data=data)
@@ -149,7 +172,7 @@ async def update_issue(
     req: IssueUpdateRequest,
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER, UserRole.DEVELOPER, UserRole.ENGINEER])),
 ):
-    """Updates an existing issue in PostgreSQL for the active organization."""
+    """Updates an existing issue in the database for the active organization."""
     data = req.model_dump(exclude_unset=True)
     issue = db_update_issue(issue_id, org_id=current_user.org_id, data=data)
     if not issue:
@@ -165,7 +188,7 @@ async def delete_issue(
     issue_id: str,
     current_user: User = Depends(require_role([UserRole.ADMIN, UserRole.MANAGER])),
 ):
-    """Deletes an issue from PostgreSQL for the active organization."""
+    """Deletes an issue from the database for the active organization."""
     success = db_delete_issue(issue_id, org_id=current_user.org_id)
     if not success:
         raise HTTPException(

@@ -10,7 +10,7 @@ import asyncio
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 from evaluation.evaluator import BugPilotEvaluator
 from evaluation.load_tester import BugPilotLoadTester
@@ -41,27 +41,27 @@ def ensure_seed_data():
 
 async def main():
     print("=" * 80)
-    print("  BUGPILOT MULTI-AGENT & MCP EVALUATION FRAMEWORK")
+    print("  BUGPILOT MULTI-AGENT & MCP EVALUATION FRAMEWORK (11 DIMENSIONS)")
     print("=" * 80)
     print("Initializing test environment & isolated data fixtures...")
     ensure_seed_data()
 
     # 1. Run Agent & MCP Evaluation Suite
-    print("\n[1/2] Executing Golden Evaluation Dataset (20 representative queries)...")
+    print("\n[1/2] Executing Golden Evaluation Dataset...")
     evaluator = BugPilotEvaluator()
     eval_summary = await evaluator.run_evaluation()
 
-    print(f"  [OK] Processed {eval_summary.total_queries} queries.")
-    print(f"  [OK] Task Success Rate: {eval_summary.task_success_rate * 100:.1f}% ({eval_summary.passed_queries}/{eval_summary.total_queries})")
-    print(f"  [OK] Intent Accuracy: {eval_summary.intent_accuracy * 100:.1f}%")
-    print(f"  [OK] Agent Routing Accuracy: {eval_summary.agent_routing_accuracy * 100:.1f}%")
-    print(f"  [OK] MCP Tool Selection Accuracy: {eval_summary.mcp_tool_accuracy * 100:.1f}%")
-    print(f"  [OK] Groundedness: {eval_summary.groundedness_rate * 100:.1f}%")
-    print(f"  [OK] Hallucination Rate: {eval_summary.hallucination_rate * 100:.1f}%")
-    print(f"  [OK] Tool Call Success Rate: {eval_summary.tool_call_success_rate * 100:.1f}%")
-    print(f"  [OK] Tool Usage Efficiency: {eval_summary.tool_usage_efficiency * 100:.1f}%")
-    print(f"  [OK] Average Reflection Score: {eval_summary.average_reflection_score:.2f} / 1.00")
-    print(f"  [OK] Latency: Mean={eval_summary.latency.mean}s, P50={eval_summary.latency.p50}s, P95={eval_summary.latency.p95}s, P99={eval_summary.latency.p99}s")
+    print(f"  [1/11] Task/Goal Success Rate: {eval_summary.task_success_rate * 100:.1f}% ({eval_summary.passed_queries}/{eval_summary.total_queries})")
+    print(f"  [2/11] Tool Selection & Call Success: Tool Acc={eval_summary.mcp_tool_accuracy * 100:.1f}%, Call Success={eval_summary.tool_call_success_rate * 100:.1f}%")
+    print(f"  [3/11] Tool Usage Efficiency: {eval_summary.tool_usage_efficiency * 100:.1f}%")
+    print(f"  [4/11] Decision/Reasoning Quality: {eval_summary.decision_reasoning_quality:.2f} / 1.00 (Reflection Score)")
+    print(f"  [5/11] Planning/Trajectory Accuracy: Trajectory Acc={eval_summary.trajectory_accuracy * 100:.1f}%, Routing Acc={eval_summary.agent_routing_accuracy * 100:.1f}%")
+    print(f"  [6/11] Groundedness & Hallucination: Groundedness={eval_summary.groundedness_rate * 100:.1f}%, Hallucination Rate={eval_summary.hallucination_rate * 100:.1f}%")
+    print(f"  [7/11] Reliability & Recovery Rate: {eval_summary.recovery_rate * 100:.1f}%")
+    print(f"  [8/11] Latency: Mean={eval_summary.latency.mean}s, P50={eval_summary.latency.p50}s, P95={eval_summary.latency.p95}s, P99={eval_summary.latency.p99}s")
+    print(f"  [9/11] Token & Cost Usage: Avg Tokens={eval_summary.average_tokens_per_query} tokens/query, Est Cost=${eval_summary.estimated_total_cost_usd:.6f} USD")
+    print(f"  [10/11] Instruction Following Rate: {eval_summary.instruction_following_rate * 100:.1f}%")
+    print(f"  [11/11] Safety & Robustness Score: {eval_summary.safety_robustness_score * 100:.1f}%")
 
     # 2. Run Scalability & Concurrency Load Test
     print("\n[2/2] Executing Scalability Load Test (1, 5, 10, 25, 50 concurrent users)...")
@@ -73,7 +73,7 @@ async def main():
 
     # 3. Export Comprehensive JSON Evaluation Report
     full_report = {
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "system": "BugPilot Multi-Agent Engineering Intelligence Platform",
         "agent_evaluation": eval_summary.model_dump(),
         "load_test_evaluation": load_report.model_dump(),

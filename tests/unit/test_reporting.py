@@ -45,33 +45,30 @@ class TestReportAndReflectionAgents:
             assert report.executive_summary.content is not None
             assert report.risk_assessment.content is not None
 
-    def test_report_agent_gemini_success(self, monkeypatch):
-        """Verify ReportAgent incorporates Gemini analysis when available."""
+    def test_report_agent_llm_success(self, monkeypatch):
+        """Verify ReportAgent incorporates LLM Gateway analysis when available."""
         from unittest.mock import patch
-        from backend.config import settings
 
         mock_ai_text = "Technical analysis indicates Authentication component is experiencing token refresh race conditions."
-        with patch.object(settings, "GEMINI_API_KEY", "mock-key-123"):
-            with patch("backend.llm.gemini_client.generate_analysis", return_value=mock_ai_text):
-                report_agent = ReportAgent()
-                report = report_agent.generate_report(
-                    query="Analyze auth issues",
-                    bug_evidence={"summary": {"total_bugs": 5, "open_bugs": 2, "critical_high_bugs": 1}},
-                    risk_evidence={"component_risks": [{"name": "Authentication", "risk_score": 85, "reasons": ["High severity"]}]},
-                )
+        with patch("backend.llm.gateway.generate_analysis", return_value=mock_ai_text):
+            report_agent = ReportAgent()
+            report = report_agent.generate_report(
+                query="Analyze auth issues",
+                bug_evidence={"summary": {"total_bugs": 5, "open_bugs": 2, "critical_high_bugs": 1}},
+                risk_evidence={"component_risks": [{"name": "Authentication", "risk_score": 85, "reasons": ["High severity"]}]},
+            )
 
-                assert isinstance(report, AnalysisReport)
-                assert "AI Evidence-Grounded Synthesis" in report.executive_summary.content
-                assert "Authentication" in report.executive_summary.content
-                assert report.raw_insights.get("ai_analysis") == mock_ai_text
-                assert report.raw_insights.get("llm_generated") is True
+            assert isinstance(report, AnalysisReport)
+            assert "AI Evidence-Grounded Synthesis" in report.executive_summary.content
+            assert "Authentication" in report.executive_summary.content
+            assert report.raw_insights.get("ai_analysis") == mock_ai_text
+            assert report.raw_insights.get("llm_generated") is True
 
-    def test_report_agent_gemini_unavailable_fallback(self):
-        """Verify ReportAgent gracefully falls back to deterministic template when Gemini returns None."""
+    def test_report_agent_llm_unavailable_fallback(self):
+        """Verify ReportAgent gracefully falls back to deterministic template when LLM returns None."""
         from unittest.mock import patch
-        from backend.config import settings
 
-        with patch.object(settings, "GEMINI_API_KEY", ""):
+        with patch("backend.llm.gateway.generate_analysis", return_value=None):
             report_agent = ReportAgent()
             report = report_agent.generate_report(
                 query="Analyze general bug status",
@@ -126,7 +123,7 @@ class TestReportAndReflectionAgents:
             summary = b_metrics.get("summary", {})
 
             ref_agent = ReflectionAgent()
-            wrong_answer = "Bug Overview: 500 total bugs, 10 open."
+            wrong_answer = f"Bug Overview: {summary.get('total_bugs', 0) + 500} total bugs, {summary.get('open_bugs', 0) + 50} open."
 
             eval_res, ref_model = ref_agent.reflect(wrong_answer, {"summary": summary})
 

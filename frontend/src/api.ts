@@ -2,12 +2,20 @@ import { ChatResponse, AgentInfo, ToolInfo, HealthInfo } from './types';
 
 const API_BASE = '/api/v1';
 
-export async function sendChatMessage(message: string): Promise<ChatResponse> {
+export async function sendChatMessage(
+  message: string,
+  token?: string,
+  orgId?: string
+): Promise<ChatResponse> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (orgId) headers['X-Organization-ID'] = orgId;
+
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({ message }),
   });
 

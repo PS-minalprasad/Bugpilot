@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class BugSeverity(str, Enum):
@@ -46,7 +46,7 @@ class Bug(BaseModel):
     A single bug / issue record.
 
     Provider-agnostic issue domain model.
-    Populated from PostgreSQL database or synthetic data.
+    Populated from PostgreSQL/SQLite database or synthetic data.
     """
 
     # Identity
@@ -58,11 +58,23 @@ class Bug(BaseModel):
     summary: str = Field(default="", description="Summary of the issue")
     description: str = Field(default="", max_length=5000)
 
-    # Classification
+    # Classification & Environment
     severity: BugSeverity
     priority: BugPriority = BugPriority.MEDIUM
     status: BugStatus = BugStatus.OPEN
-    resolution: Optional[str] = Field(default=None, description="Resolution status, e.g. Done, Duplicate")
+    resolution: Optional[str] = Field(default=None, description="Resolution status, e.g. Fixed, Won't Fix, Duplicate")
+    environment: Optional[str] = Field(default="production", description="Environment e.g. production, staging, development")
+    affected_version: Optional[str] = Field(default=None, description="Affected release version")
+    fix_version: Optional[str] = Field(default=None, description="Fix version release")
+
+    # Deep Evidence & Investigation Context
+    root_cause: Optional[str] = Field(default=None, description="Identified root cause analysis")
+    business_impact: Optional[str] = Field(default=None, description="Business impact assessment")
+    steps_to_reproduce: Optional[str] = Field(default=None, description="Steps to reproduce the bug")
+    expected_behavior: Optional[str] = Field(default=None, description="Expected system behavior")
+    actual_behavior: Optional[str] = Field(default=None, description="Actual observed behavior")
+    comments: List[Dict[str, Any]] = Field(default_factory=list, description="List of discussion/investigation comments")
+    linked_issue_ids: List[str] = Field(default_factory=list, description="IDs of linked or related bugs/issues")
 
     # Organisation
     component: str = Field(..., description="System component or service name")
@@ -80,7 +92,6 @@ class Bug(BaseModel):
     # Sprint linkage (populated in Phase 2)
     sprint_id: Optional[str] = None
     sprint: Optional[str] = Field(default=None, description="Sprint name or ID")
-    fix_version: Optional[str] = Field(default=None, description="Fix version release")
     reopened_count: int = Field(default=0, ge=0, description="Number of times the bug was reopened")
 
     # Data provenance — MUST be set by the provider
@@ -104,8 +115,6 @@ class Bug(BaseModel):
     def validate_resolved_at(cls, v: Optional[datetime], info) -> Optional[datetime]:
         """resolved_at must be after created_at when set."""
         return v
-
-    from pydantic import model_validator
 
     @model_validator(mode="before")
     @classmethod

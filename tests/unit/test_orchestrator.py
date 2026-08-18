@@ -130,3 +130,45 @@ class TestOrchestratorAgentIntegration:
             with pytest.raises(AgentTimeoutError) as exc_info:
                 await orchestrator.run("Analyze bug metrics")
             assert "timed out" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_orchestrator_llm_react_call_tool_and_finish(self):
+        """Verify dynamic LLM-driven CALL_TOOL -> observation -> FINISH loop."""
+        from unittest.mock import AsyncMock, patch
+
+        decisions = [
+            {"action": "CALL_TOOL", "tool_name": "get_bug_metrics", "arguments": {}},
+            {"action": "FINISH"},
+        ]
+
+        async with MCPClient() as client:
+            orchestrator = OrchestratorAgent(client)
+            with patch("agents.orchestrator.generate_react_decision", side_effect=decisions):
+                res = await orchestrator.run("What are the bug statistics?")
+
+                assert res.status == "success"
+                assert len(res.execution_steps) == 1
+                assert res.execution_steps[0].tool_name == "get_bug_metrics"
+                assert res.final_answer is not None
+
+    @pytest.mark.asyncio
+    async def test_orchestrator_llm_react_delegate_and_finish(self):
+        """Verify dynamic LLM-driven CALL_TOOL -> observation -> DELEGATE -> FINISH loop."""
+        from unittest.mock import AsyncMock, patch
+
+        decisions = [
+            {"action": "CALL_TOOL", "tool_name": "get_component_risk", "arguments": {}},
+            {"action": "DELEGATE", "agent": "Risk Analyst", "task": "Deep dive into component risk"},
+            {"action": "FINISH"},
+        ]
+
+        async with MCPClient() as client:
+            orchestrator = OrchestratorAgent(client)
+            with patch("agents.orchestrator.generate_react_decision", side_effect=decisions):
+                res = await orchestrator.run("Analyze component risks in detail")
+
+                assert res.status == "success"
+                assert len(res.execution_steps) == 2
+                assert res.execution_steps[0].tool_name == "get_component_risk"
+                assert res.execution_steps[1].agent_name == "Risk Analyst"
+                assert res.final_answer is not None

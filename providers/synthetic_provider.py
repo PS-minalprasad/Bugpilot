@@ -77,12 +77,16 @@ class SyntheticProvider(DataProvider):
         q = query.strip().lower()
         results = []
         for b in self._bugs:
+            sev_str = b.severity.value if hasattr(b.severity, "value") else str(b.severity)
+            stat_str = b.status.value if hasattr(b.status, "value") else str(b.status)
             if (
                 q in b.id.lower()
                 or q in b.summary.lower()
                 or q in b.description.lower()
                 or q in b.component.lower()
                 or q in b.project.lower()
+                or q in sev_str.lower()
+                or q in stat_str.lower()
             ):
                 results.append(b)
 
@@ -96,6 +100,102 @@ class SyntheticProvider(DataProvider):
         """Retrieve a single sprint by ID."""
         return self._sprint_map.get(sprint_id.strip().upper())
 
+    def get_bug_history(self, bug_id: str) -> Optional[dict]:
+        """Retrieve chronological history, status transitions, and comments for a bug."""
+        bug = self.get_bug(bug_id)
+        if not bug:
+            return None
+
+        # Build chronological timeline
+        transitions = [
+            {
+                "timestamp": bug.created_at.isoformat() + "Z" if hasattr(bug.created_at, "isoformat") else str(bug.created_at),
+                "from_status": None,
+                "to_status": "Open",
+                "actor": bug.reporter,
+                "event": "Issue Created",
+            }
+        ]
+
+        if bug.assignee and bug.status != "open":
+            transitions.append({
+                "timestamp": (bug.created_at + (bug.updated_at - bug.created_at) * 0.2).isoformat() + "Z",
+                "from_status": "Open",
+                "to_status": "In Progress",
+                "actor": bug.assignee,
+                "event": f"Assigned to {bug.assignee} and transitioned to In Progress",
+            })
+
+        if bug.reopened_count > 0:
+            for r_idx in range(1, bug.reopened_count + 1):
+                transitions.append({
+                    "timestamp": (bug.created_at + (bug.updated_at - bug.created_at) * (0.3 + 0.1 * r_idx)).isoformat() + "Z",
+                    "from_status": "Resolved",
+                    "to_status": "Open",
+                    "actor": bug.reporter,
+                    "event": f"Bug Reopened (Cycle #{r_idx})",
+                })
+
+        if bug.resolved_at:
+            transitions.append({
+                "timestamp": bug.resolved_at.isoformat() + "Z" if hasattr(bug.resolved_at, "isoformat") else str(bug.resolved_at),
+                "from_status": "In Progress" if bug.reopened_count == 0 else "In Review",
+                "to_status": bug.status.capitalize() if hasattr(bug.status, "capitalize") else str(bug.status),
+                "actor": bug.assignee or bug.reporter,
+                "event": f"Resolved as {bug.resolution or 'Fixed'}",
+            })
+
+        return {
+            "bug_id": bug.id,
+            "title": bug.title,
+            "current_status": bug.status,
+            "reopen_count": bug.reopened_count,
+            "created_at": bug.created_at.isoformat() + "Z" if hasattr(bug.created_at, "isoformat") else str(bug.created_at),
+            "updated_at": bug.updated_at.isoformat() + "Z" if hasattr(bug.updated_at, "isoformat") else str(bug.updated_at),
+            "resolved_at": bug.resolved_at.isoformat() + "Z" if bug.resolved_at and hasattr(bug.resolved_at, "isoformat") else (str(bug.resolved_at) if bug.resolved_at else None),
+            "status_transitions": transitions,
+            "comments": bug.comments,
+            "linked_issue_ids": bug.linked_issue_ids,
+            "root_cause": bug.root_cause,
+            "data_source": bug.data_source,
+        }
+
+    def get_related_bugs(self, bug_id: str, limit: int = 10) -> List[Bug]:
+        """Retrieve related bugs by linked IDs, matching component, or labels."""
+        bug = self.get_bug(bug_id)
+        if not bug:
+            return []
+
+        related: List[Bug] = []
+        seen_ids = {bug.id.upper()}
+
+        # 1. Directly linked issues
+        for linked_id in bug.linked_issue_ids:
+            linked_b = self.get_bug(linked_id)
+            if linked_b and linked_b.id.upper() not in seen_ids:
+                related.append(linked_b)
+                seen_ids.add(linked_b.id.upper())
+
+        # 2. Same component issues
+        for b in self._bugs:
+            if len(related) >= limit:
+                break
+            if b.id.upper() not in seen_ids and b.component.lower() == bug.component.lower():
+                related.append(b)
+                seen_ids.add(b.id.upper())
+
+        # 3. Same project issues if still under limit
+        if len(related) < limit:
+            for b in self._bugs:
+                if len(related) >= limit:
+                    break
+                if b.id.upper() not in seen_ids and b.project.upper() == bug.project.upper():
+                    related.append(b)
+                    seen_ids.add(b.id.upper())
+
+        return related[:limit]
+
 
 # Alias for backward compatibility during transition
 MockJiraProvider = SyntheticProvider
+

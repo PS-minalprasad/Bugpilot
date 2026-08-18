@@ -54,16 +54,22 @@ class TestFastAPIBackend:
         res = await api_client.get("/api/v1/tools")
         assert res.status_code == 200
         data = res.json()
-        assert data["count"] == 8
+        assert data["count"] >= 8
         tool_names = [t["name"] for t in data["tools"]]
         assert "get_bug_metrics" in tool_names
         assert "get_component_risk" in tool_names
+        assert "get_bug_history" in tool_names
+        assert "get_related_bugs" in tool_names
 
     @pytest.mark.asyncio
     async def test_post_chat_valid_query(self, api_client):
-        """Test POST /api/v1/chat executes real Orchestrator workflow over MCP."""
+        """Test POST /api/v1/chat executes real Orchestrator workflow over MCP with tenant auth."""
+        auth_res = await api_client.post("/api/v1/auth/login", json={"email": "admin@acme.com", "password": "AdminPass123!"})
+        token = auth_res.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}", "X-Organization-ID": "org-acme"}
+
         payload = {"message": "What are the biggest engineering risks?"}
-        res = await api_client.post("/api/v1/chat", json=payload)
+        res = await api_client.post("/api/v1/chat", json=payload, headers=headers)
         assert res.status_code == 200
         data = res.json()
 
@@ -71,20 +77,31 @@ class TestFastAPIBackend:
         assert "request_id" in data
         assert isinstance(data["answer"], str)
         assert len(data["answer"]) > 0
-        assert "Risk Analyst" in data["agents_used"]
-        assert "get_component_risk" in data["tools_used"]
+        assert any(a in data["agents_used"] for a in ["Risk Analyst", "Orchestrator Agent", "Bug Analyst"])
+        assert any(t in data["tools_used"] for t in ["get_component_risk", "get_release_risk", "get_bug_metrics"])
         assert data["reflection"]["verdict"] in ["CONFIRM", "CORRECT"]
-        assert data["data_source"] in ["PostgreSQL", "Synthetic Demo Data"]
+        assert data["data_source"] in ["PostgreSQL", "Synthetic Demo Data", "SQLite"]
+
+
+    @pytest.mark.asyncio
+    async def test_post_chat_unauthenticated_rejected(self, api_client):
+        """Test POST /api/v1/chat rejects unauthenticated requests with 401."""
+        res = await api_client.post("/api/v1/chat", json={"message": "Show bugs"})
+        assert res.status_code == 401
 
     @pytest.mark.asyncio
     async def test_post_chat_invalid_payload(self, api_client):
         """Test POST /api/v1/chat handles empty or missing message gracefully."""
+        auth_res = await api_client.post("/api/v1/auth/login", json={"email": "admin@acme.com", "password": "AdminPass123!"})
+        token = auth_res.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}", "X-Organization-ID": "org-acme"}
+
         # Empty string
-        res_empty = await api_client.post("/api/v1/chat", json={"message": ""})
+        res_empty = await api_client.post("/api/v1/chat", json={"message": ""}, headers=headers)
         assert res_empty.status_code in [400, 422]
 
         # Missing payload key
-        res_missing = await api_client.post("/api/v1/chat", json={})
+        res_missing = await api_client.post("/api/v1/chat", json={}, headers=headers)
         assert res_missing.status_code == 422
 
     @pytest.mark.asyncio

@@ -23,6 +23,7 @@ from models.analytics import (
     AnalyticsPayload,
 )
 from providers.base import DataProvider
+from backend.config import settings
 
 
 class AnalyticsService:
@@ -82,7 +83,7 @@ class AnalyticsService:
         # 8. Compute Release Risk Heatmap
         release_risks = self._compute_release_risks(bugs)
 
-        fallback_ds = getattr(self.provider, "data_source", "PostgreSQL")
+        fallback_ds = getattr(self.provider, "data_source", settings.data_label)
         ds = bugs[0].data_source if bugs else fallback_ds
         return AnalyticsPayload(
             summary=summary,
@@ -97,7 +98,7 @@ class AnalyticsService:
 
     def _compute_summary(self, bugs: List[Bug], ref_time: datetime) -> SummaryMetrics:
         total = len(bugs)
-        fallback_ds = getattr(self.provider, "data_source", "PostgreSQL")
+        fallback_ds = getattr(self.provider, "data_source", settings.data_label)
         ds = bugs[0].data_source if bugs else fallback_ds
         if total == 0:
             return SummaryMetrics(
@@ -309,6 +310,8 @@ class AnalyticsService:
                 RiskMetric(
                     name=comp_name,
                     risk_score=round(final_score, 1),
+                    open_issues=len(open_bugs),
+                    critical_high_issues=len(crit_high_open),
                     reasons=reasons,
                     metrics={
                         "open_bugs_count": len(open_bugs),
@@ -375,6 +378,8 @@ class AnalyticsService:
                 RiskMetric(
                     name=rel_name,
                     risk_score=round(final_score, 1),
+                    open_issues=len(open_bugs),
+                    critical_high_issues=len(crit_high_open),
                     reasons=reasons,
                     metrics={
                         "open_bugs_count": len(open_bugs),

@@ -75,6 +75,7 @@ class ChatResponse(BaseModel):
     intent: Optional[str] = None
     agents_used: List[str]
     tools_used: List[str]
+    execution_steps: List[Dict[str, Any]] = Field(default_factory=list)
     metrics: Dict[str, Any]
     reflection: Dict[str, Any]
     data_source: str = settings.DATA_LABEL
@@ -191,21 +192,36 @@ async def get_metrics_v1(
 @router.post("/chat", response_model=ChatResponse, summary="POST /api/v1/chat")
 async def post_chat_v1(
     chat_req: ChatRequest,
-    x_request_id: Optional[str] = Header(default=None)
+    current_user: User = Depends(enforce_tenant_isolation),
+    x_request_id: Optional[str] = Header(default=None),
 ) -> ChatResponse:
-    """Connects user message to the real Orchestrator agent workflow."""
+    """Connects user message to the real Orchestrator agent workflow with tenant isolation."""
     if not chat_req.message or not chat_req.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
-    request_id = x_request_id or f"req-{uuid.uuid4().hex[:8]}"
+    request_id = str(x_request_id) if (x_request_id and isinstance(x_request_id, str)) else f"req-{uuid.uuid4().hex[:8]}"
     start_time = time.time()
 
     async with MCPClient() as client:
         orchestrator = OrchestratorAgent(mcp_client=client)
         try:
-            orc_res = await orchestrator.run(chat_req.message)
+            orc_res = await orchestrator.run(chat_req.message, org_id=current_user.org_id)
         except Exception as err:
             raise HTTPException(status_code=500, detail=f"Orchestration failed: {str(err)}")
+
+        if orc_res.intent == "OUT_OF_DOMAIN":
+            return ChatResponse(
+                execution_id=orc_res.execution_id,
+                request_id=request_id,
+                answer=orc_res.final_answer,
+                intent="OUT_OF_DOMAIN",
+                agents_used=[],
+                tools_used=[],
+                metrics={},
+                reflection={"verdict": "CONFIRM", "quality_score": 1.0, "gaps": [], "corrections": []},
+                data_source=settings.DATA_LABEL,
+                elapsed_seconds=round(time.time() - start_time, 3),
+            )
 
         agents_used = list({step.agent_name for step in orc_res.execution_steps})
         tools_used = list({step.tool_name for step in orc_res.execution_steps})
@@ -214,7 +230,7 @@ async def post_chat_v1(
         metrics_data = {}
         if "get_bug_metrics" in tools_used:
             try:
-                metrics_res = await client.call_tool("get_bug_metrics")
+                metrics_res = await client.call_tool("get_bug_metrics", {"org_id": current_user.org_id})
                 metrics_data = metrics_res.get("summary", {})
             except Exception:
                 pass
@@ -240,6 +256,7 @@ async def post_chat_v1(
             intent=orc_res.intent,
             agents_used=agents_used,
             tools_used=tools_used,
+            execution_steps=[s.model_dump() for s in orc_res.execution_steps],
             metrics=metrics_data,
             reflection=reflection_info,
             data_source=settings.DATA_LABEL,

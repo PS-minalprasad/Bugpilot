@@ -22,7 +22,7 @@ asyncio_mode   = "auto"
 pythonpath     = ["."]
 testpaths      = ["tests"]
 addopts        = "-v --tb=short"
-markers        = ["llm: integration tests calling real Gemini LLM API"]
+markers        = ["llm: integration tests calling real LLM API"]
 
 # =============================================================================
 # Coverage

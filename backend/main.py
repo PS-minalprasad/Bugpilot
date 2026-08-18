@@ -49,10 +49,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if settings.is_production and settings.JWT_SECRET == "bugpilot-super-secret-jwt-key-2026-change-in-production":
         raise ValueError("JWT_SECRET must be changed from default value in production.")
 
-    if not settings.GEMINI_API_KEY:
-        logger.warning("GEMINI_API_KEY is missing from environment. LLM functions will run in deterministic fallback mode.")
+    if not settings.GROQ_API_KEY:
+        logger.info("GROQ_API_KEY is not set. LLM Gateway will use local Ollama fallback or deterministic mode.")
     else:
-        logger.info(f"LLM initialized with model '{settings.GEMINI_MODEL}'")
+        logger.info(f"LLM initialized with Groq primary model '{settings.GROQ_MODEL}' and Ollama fallback '{settings.OLLAMA_MODEL}'")
 
     logger.info(
         "BugPilot starting",
@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "env": settings.ENV,
             "host": settings.HOST,
             "port": settings.PORT,
-            "llm_ready": bool(settings.GEMINI_API_KEY),
+            "llm_ready": bool(settings.GROQ_API_KEY or settings.OLLAMA_BASE_URL),
         },
     )
     yield

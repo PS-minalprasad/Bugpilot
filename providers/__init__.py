@@ -3,7 +3,7 @@ from typing import Optional
 
 from providers.base import DataProvider
 from providers.synthetic_provider import SyntheticProvider, MockJiraProvider
-from providers.postgres_provider import PostgresProvider
+from providers.data_provider import PostgresProvider, SQLDataProvider, SQLiteProvider
 
 
 def get_data_provider(mode: Optional[str] = None, org_id: Optional[str] = None) -> DataProvider:
@@ -21,7 +21,15 @@ def get_data_provider(mode: Optional[str] = None, org_id: Optional[str] = None) 
     if provider_mode == "synthetic":
         return SyntheticProvider()
 
-    return PostgresProvider(org_id=active_org)
+    return SQLDataProvider(org_id=active_org)
 
 
-__all__ = ["DataProvider", "SyntheticProvider", "MockJiraProvider", "PostgresProvider", "get_data_provider"]
+__all__ = [
+    "DataProvider",
+    "SyntheticProvider",
+    "MockJiraProvider",
+    "PostgresProvider",
+    "SQLDataProvider",
+    "SQLiteProvider",
+    "get_data_provider",
+]

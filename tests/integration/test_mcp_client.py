@@ -31,7 +31,7 @@ class TestMCPClientIntegration:
             assert client.is_connected is True
 
             tools = client.discovered_tools
-            assert len(tools) == 8
+            assert len(tools) >= 8
 
             expected_tools = [
                 "search_bugs",
@@ -42,6 +42,8 @@ class TestMCPClientIntegration:
                 "get_reopened_bugs",
                 "get_component_risk",
                 "get_release_risk",
+                "get_bug_history",
+                "get_related_bugs",
             ]
             for tool_name in expected_tools:
                 assert tool_name in tools

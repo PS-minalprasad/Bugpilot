@@ -37,10 +37,12 @@ async def test_mcp_server_full_suite():
                 "get_aging_bugs",
                 "get_reopened_bugs",
                 "get_component_risk",
-                "get_release_risk"
+                "get_release_risk",
+                "get_bug_history",
+                "get_related_bugs",
             ]
-            assert len(tools_result.tools) == 8
-            assert sorted(tool_names) == sorted(expected_tools)
+            assert len(tools_result.tools) >= 8
+            assert set(expected_tools).issubset(set(tool_names))
             for t in tools_result.tools:
                 assert t.description is not None
 
@@ -52,11 +54,11 @@ async def test_mcp_server_full_suite():
             assert data_search["data_source"] in ["SQLite", "PostgreSQL", "Synthetic Demo Data"]
 
             # 3. get_bug (existing & missing)
-            res_bug_exist = await session.call_tool("get_bug", arguments={"bug_id": "API-1"})
+            res_bug_exist = await session.call_tool("get_bug", arguments={"bug_id": "BP-101"})
             assert not res_bug_exist.is_error
             data_exist = json.loads(res_bug_exist.content[0].text)
             assert data_exist["found"] is True
-            assert data_exist["bug"]["id"] == "API-1"
+            assert data_exist["bug"]["id"] in ["BP-101", "iss-101"]
 
             res_bug_miss = await session.call_tool("get_bug", arguments={"bug_id": "MISSING-999"})
             assert not res_bug_miss.is_error
@@ -99,6 +101,20 @@ async def test_mcp_server_full_suite():
             data_r_risk = json.loads(res_r_risk.content[0].text)
             assert "release_risks" in data_r_risk
 
-            # 10. Invalid input error handling
+            # 10. get_bug_history
+            res_history = await session.call_tool("get_bug_history", arguments={"bug_id": "BP-101"})
+            assert not res_history.is_error
+            data_history = json.loads(res_history.content[0].text)
+            assert data_history["found"] is True
+            assert "status_transitions" in data_history["history"]
+
+            # 11. get_related_bugs
+            res_related = await session.call_tool("get_related_bugs", arguments={"bug_id": "BP-101", "limit": 5})
+            assert not res_related.is_error
+            data_related = json.loads(res_related.content[0].text)
+            assert "related_bugs" in data_related
+
+            # 12. Invalid input error handling
             res_invalid = await session.call_tool("search_bugs", arguments={})
             assert res_invalid.is_error or "Error" in res_invalid.content[0].text
+

@@ -5,12 +5,25 @@ export interface ReflectionInfo {
   corrections: string[];
 }
 
+export interface ExecutionStep {
+  execution_id?: string;
+  step_number: number;
+  agent_name: string;
+  tool_name: string;
+  intent?: string;
+  status: string;
+  result_summary: string;
+  duration_seconds: number;
+}
+
 export interface ChatResponse {
   execution_id: string;
   request_id: string;
   answer: string;
+  intent?: string;
   agents_used: string[];
   tools_used: string[];
+  execution_steps?: ExecutionStep[];
   metrics: Record<string, any>;
   reflection: ReflectionInfo;
   data_source: string;

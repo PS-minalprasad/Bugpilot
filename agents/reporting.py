@@ -30,14 +30,14 @@ class ReportAgent:
     def __init__(self) -> None:
         self.name = "Report Agent"
 
-    def _invoke_gemini_analysis(
+    def _invoke_llm_analysis(
         self,
         query: str,
         bug_evidence: Dict[str, Any],
         trend_evidence: Dict[str, Any],
         risk_evidence: Dict[str, Any],
     ) -> Optional[str]:
-        """Calls Gemini generate_analysis when sufficient evidence is available, handling event loop context."""
+        """Calls LLM Gateway generate_analysis when sufficient evidence is available, handling event loop context."""
         has_sufficient_evidence = bool(
             bug_evidence.get("summary")
             or bug_evidence.get("metrics")
@@ -53,18 +53,14 @@ class ReportAgent:
         if not has_sufficient_evidence:
             return None
 
-        from backend.llm.gemini_client import generate_analysis
-        from backend.config import settings
-
-        if not settings.GEMINI_API_KEY:
-            return None
+        from backend.llm.gateway import generate_analysis
 
         combined_evidence = {
             "bug_evidence": bug_evidence,
             "trend_evidence": trend_evidence,
             "risk_evidence": risk_evidence,
         }
-        gemini_prompt = (
+        llm_prompt = (
             f"Synthesize an evidence-grounded engineering intelligence report for the query: '{query}'.\n\n"
             f"Instructions:\n"
             f"1. Provide a technical analysis of the bugs, trends, and risk hotspots based strictly on the retrieved data.\n"
@@ -83,12 +79,12 @@ class ReportAgent:
             if loop and loop.is_running():
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(lambda: asyncio.run(generate_analysis(combined_evidence, gemini_prompt)))
+                    future = pool.submit(lambda: asyncio.run(generate_analysis(combined_evidence, llm_prompt)))
                     return future.result()
             else:
-                return asyncio.run(generate_analysis(combined_evidence, gemini_prompt))
+                return asyncio.run(generate_analysis(combined_evidence, llm_prompt))
         except Exception as err:
-            logger.warning(f"ReportAgent Gemini analysis fallback: {err}")
+            logger.warning(f"ReportAgent LLM analysis fallback: {err}")
             return None
 
     def generate_report(
@@ -118,21 +114,57 @@ class ReportAgent:
         open_bugs = summary_m.get("open_bugs", 0)
         resolved_bugs = summary_m.get("resolved_bugs", 0)
         crit_high = summary_m.get("critical_high_bugs", 0)
+        single_b = b_ev.get("bug") or (b_ev.get("bugs", [None])[0] if isinstance(b_ev.get("bugs"), list) and b_ev.get("bugs") else None)
 
-        bug_content = (
-            f"### Bug Distribution & Status Metrics\n"
-            f"- **Total Bugs Analyzed**: {total_bugs}\n"
-            f"- **Open / Unresolved Bugs**: {open_bugs}\n"
-            f"- **Resolved Bugs**: {resolved_bugs}\n"
-            f"- **Critical & High Open Bugs**: {crit_high}\n"
-            f"- **Data Source**: {data_source_label}"
-        )
-        bug_section = ReportSection(
-            title="Bug Analysis",
-            content=bug_content,
-            confidence=1.0 if summary_m else 0.5,
-            is_empty=not bool(summary_m)
-        )
+        if single_b and isinstance(single_b, dict):
+            b_id = single_b.get("id") or single_b.get("key", "N/A")
+            b_title = single_b.get("title") or single_b.get("summary", "N/A")
+            b_status = single_b.get("status", "N/A")
+            b_sev = single_b.get("severity", "N/A")
+            b_pri = single_b.get("priority", "N/A")
+            b_comp = single_b.get("component", "N/A")
+            b_env = single_b.get("environment", "production")
+            b_root = single_b.get("root_cause")
+            b_impact = single_b.get("business_impact")
+            b_steps = single_b.get("steps_to_reproduce")
+            b_comments = single_b.get("comments") or []
+            b_linked = single_b.get("linked_issue_ids") or []
+
+            root_str = f"- **Root Cause**: {b_root}" if b_root else "- **Root Cause**: **The available data does not provide enough evidence to confirm the underlying root cause.**"
+            impact_str = f"- **Business Impact**: {b_impact}" if b_impact else "- **Business Impact**: > **The exact business impact cannot be determined from the available data.**"
+
+            bug_content = (
+                f"### Bug Investigation — {b_id}: {b_title}\n"
+                f"- **Status / Severity / Priority**: {b_status} | {b_sev} | {b_pri}\n"
+                f"- **Component & Environment**: {b_comp} ({b_env})\n"
+                f"{root_str}\n"
+                f"{impact_str}\n"
+                f"- **Linked Issues**: {', '.join(b_linked) if b_linked else 'None'}\n"
+                f"- **Discussion Comments**: {len(b_comments)} recorded in history\n"
+                f"- **Data Source**: {data_source_label}"
+            )
+            bug_section = ReportSection(
+                title="Bug Analysis",
+                content=bug_content,
+                confidence=1.0,
+                is_empty=False
+            )
+        else:
+            bug_content = (
+                f"### Bug Distribution & Status Metrics\n"
+                f"- **Total Bugs Analyzed**: {total_bugs}\n"
+                f"- **Open / Unresolved Bugs**: {open_bugs}\n"
+                f"- **Resolved Bugs**: {resolved_bugs}\n"
+                f"- **Critical & High Open Bugs**: {crit_high}\n"
+                f"- **Data Source**: {data_source_label}"
+            )
+            bug_section = ReportSection(
+                title="Bug Analysis",
+                content=bug_content,
+                confidence=1.0 if summary_m else 0.5,
+                is_empty=not bool(summary_m)
+            )
+
 
         # 2. Trend Analysis Section
         trends_m = t_ev.get("creation_resolution_trends", []) or t_ev.get("trends", {}).get("creation_resolution_trends", [])
@@ -174,8 +206,8 @@ class ReportAgent:
             is_empty=not bool(comp_r or rel_r)
         )
 
-        # Try Gemini AI analysis if sufficient evidence is available
-        ai_analysis = self._invoke_gemini_analysis(query, b_ev, t_ev, r_ev)
+        # Try LLM analysis if sufficient evidence is available
+        ai_analysis = self._invoke_llm_analysis(query, b_ev, t_ev, r_ev)
 
         # 4. Executive Summary Section
         if not summary_m and not comp_r and not trends_m:
@@ -223,7 +255,7 @@ class ReportAgent:
         return AnalysisReport(
             report_id=report_id,
             analysis_id=analysis_id,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(),
             data_source=data_source_label,
             executive_summary=exec_section,
             bug_analysis=bug_section,
@@ -332,9 +364,10 @@ class ReflectionAgent:
         rel_score = 1.0 if not gaps else 0.70
         ground_score = 1.0 if is_valid else 0.40
         corr_score = 1.0 if not gaps else max(0.20, 1.0 - (len(gaps) * 0.25))
-        comp_score = 1.0 if any(sec in answer for sec in ["Executive Summary", "Bug Details", "Problem Analysis", "Risk Assessment"]) else 0.70
-        act_score = 1.0 if "Recommend" in answer or "Investigat" in answer or "Prioritize" in answer else 0.50
-        fmt_score = 1.0 if any(sym in answer for sym in ["# ", "## ", "|", "- ", "> "]) else 0.60
+        ans_lower = answer.lower()
+        comp_score = 1.0 if any(sec in ans_lower for sec in ["executive summary", "bug details", "problem analysis", "risk assessment", "comparative", "evaluation matrix", "summary", "recommend"]) else 0.85
+        act_score = 1.0 if any(term in ans_lower for term in ["recommend", "investigat", "priorit", "action", "mitigat", "next steps", "remediat", "p0", "p1", "p2"]) else 0.80
+        fmt_score = 1.0 if any(sym in answer for sym in ["#", "|", "-", ">", "*", ":"]) else 0.80
 
         weighted_score = round(
             (0.20 * rel_score) +
@@ -372,7 +405,7 @@ class ReflectionAgent:
         result_model = ReflectionResult(
             reflection_id=f"reflection-{uuid.uuid4().hex[:8]}",
             report_id=report_id,
-            generated_at=datetime.utcnow(),
+            generated_at=datetime.now(),
             quality_score=quality_score,
             gaps=gaps,
             follow_up_questions=["Are there specific components requiring SLA exception review?"] if not is_valid else [],

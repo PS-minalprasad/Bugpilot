@@ -46,7 +46,7 @@ async def health() -> HealthResponse:
         app=settings.APP_NAME,
         version=settings.APP_VERSION,
         env=settings.ENV,
-        timestamp=datetime.utcnow().isoformat() + "Z",
+        timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         data_source=settings.data_label,
     )
 
@@ -79,7 +79,7 @@ async def readiness() -> ReadinessResponse:
         "database": {
             "status": "ready" if db_healthy else "error",
             "latency_ms": db_latency_ms,
-            "detail": "PostgreSQL/SQLite database connected" if db_healthy else "Database connection failed",
+            "detail": f"{settings.data_label} database connected" if db_healthy else "Database connection failed",
         },
         "data_provider": {
             "status": "ready",
@@ -92,8 +92,8 @@ async def readiness() -> ReadinessResponse:
             "detail": "MCP server online with 8 tools",
         },
         "llm": {
-            "status": "ready" if settings.GEMINI_API_KEY else "not_configured",
-            "detail": f"LLM model: {settings.GEMINI_MODEL}" if settings.GEMINI_API_KEY else "LLM not configured (GEMINI_API_KEY missing)",
+            "status": "ready" if (settings.GROQ_API_KEY or settings.OLLAMA_BASE_URL) else "not_configured",
+            "detail": f"LLM Primary: Groq ({settings.GROQ_MODEL}), Fallback: Ollama ({settings.OLLAMA_MODEL})" if settings.GROQ_API_KEY else f"LLM Fallback: Ollama ({settings.OLLAMA_MODEL})",
         },
     }
 

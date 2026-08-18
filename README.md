@@ -1,170 +1,178 @@
 # BugPilot
 ### AI-Powered Engineering Bug Intelligence Agent
 
-> **Data Architecture**: BugPilot runs on a persistent, multi-tenant **SQL database path by default** (`PROVIDER_MODE=sql`, storing data in local SQLite `sqlite:///./bugpilot.db` with zero external setup required). Point `DATABASE_URL` at a live PostgreSQL server for production deployments (`PROVIDER_MODE=postgres`). All issue creation, status updates, sprint assignments, and status transitions dynamically flow through analytics, MCP tools, and agent workflows in real time. Synthetic demo data is also supported via `PROVIDER_MODE=synthetic`, and real Jira Cloud instances can be connected via Atlassian OAuth (`PROVIDER_MODE=jira_cloud`).
+> **Core Architecture**: BugPilot runs on a clean, end-to-end decoupled pipeline:
+> **React / Vite** $\longrightarrow$ **FastAPI Backend** $\longrightarrow$ **ReAct Orchestrator** $\longrightarrow$ **Specialist Agents** $\longrightarrow$ **MCP Client** $\longrightarrow$ **MCP Server** $\longrightarrow$ **10 Read-Only Tools** $\longrightarrow$ **SQLite Database (Synthetic Jira Data)**.
 
 ---
 
-## Architecture
+## 1. System Architecture
 
 ```
-User / React Frontend (TypeScript + Vite)
- ↓ HTTP REST API (JWT + RBAC + Multi-Tenant Isolation)
-FastAPI Backend (Port 8000)
- ↓
-Orchestrator Agent
- ↓         ↓         ↓
-Bug       Trend     Risk       Specialist Agents
-Analyst   Analyst   Analyst
- ↓         ↓         ↓
-         MCP Client
-              ↓
-         MCP Server (Read-Only Tools)
-              ↓
-         AnalyticsService
-              ↓
-         DataProvider Interface
-              ↓
-   ┌──────────┴──────────┐
-   │                     │
-PostgresProvider    SyntheticProvider
-(Live DB default)   (Demo Mode)
-   │
-SQL Database (SQLite / PostgreSQL)
-(issues, sprints, users, orgs)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       React / Vite Frontend (TypeScript)                     │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ HTTP REST API (JWT + RBAC + Tenant Isolation)
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          FastAPI Backend (Port 8000)                         │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       ReAct Orchestrator Agent                              │
+│         Dynamic reasoning loop: Goal → LLM Decision → Tool Call →           │
+│                    Observation → Next Decision → FINISH                     │
+│               [Groq Primary API + Local Ollama Fallback]                    │
+└───────────┬──────────────────────────┼──────────────────────────┬───────────┘
+            │                          │                          │
+            ▼                          ▼                          ▼
+┌──────────────────────┐   ┌──────────────────────┐   ┌──────────────────────┐
+│  Bug Analyst Agent   │   │ Trend Analyst Agent  │   │ Risk Analyst Agent   │
+└───────────┬──────────┘   └──────────┬───────────┘   └──────────┬───────────┘
+            │                          │                          │
+            └──────────────────────────┼──────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                 MCP Client                                  │
+│                 Dynamic tool discovery, timeout & sandboxing                │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ stdio JSON-RPC Transport
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         MCP Server (mcp_server)                             │
+│                  Exposes 10 Strict READ-ONLY Tools                          │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              AnalyticsService                               │
+│              Deterministic metric calculation & statistical trends          │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                 DataProvider Interface (SQLDataProvider / SQLite)           │
+│                 Multi-tenant tenant isolation (`organization_id`)           │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    SQLite Database (`sqlite:///./bugpilot.db`)              │
+│       Realistic Jira-style Defect Catalog, Sprints, Users & Audit Trails    │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Data Access Contract (STRICT)
+### Strict Data Access Contract
 ```
-✅ Agent → MCP Client → MCP Server → AnalyticsService → DataProvider → Data
-❌ Agent → DataProvider (FORBIDDEN)
-❌ Agent → Data files  (FORBIDDEN)
-❌ Any RAG / embeddings / vector DB (FORBIDDEN)
+✅ Agent → MCP Client → MCP Server → AnalyticsService → DataProvider → SQLite Data
+❌ Agent → Direct Database Access (FORBIDDEN)
+❌ Agent → Direct Data File Reading (FORBIDDEN)
+❌ External Vector Database / RAG dependencies (FORBIDDEN)
 ```
-Agents never import `providers/` or `backend/database` directly — verified via static analysis test suites.
+Agents interact exclusively through dynamically discovered MCP tools, preserving sandboxing and full testability.
 
 ---
 
-## Data Providers & Storage Modes
+## 2. 10 MCP Tools Reference
 
-| Provider | Mode Flag | Data Label | Storage | Features |
-|----------|-----------|------------|---------|----------|
-| **`PostgresProvider` (Default)** | `sql` / `postgres` | `SQLite` / `PostgreSQL` | Persistent SQLite (zero setup) / PostgreSQL | Fully dynamic live user CRUD, sprint tracking (`sprint_id`), status transition reopen tracking (`reopen_count`), and real-time agent/MCP intelligence. |
-| **`SyntheticProvider`** | `synthetic` | `Synthetic Demo Data` | In-memory generated data | Instant demonstration mode with 1000 generated bugs across 14 sprints for offline testing. |
-| **`JiraCloudProvider`** | `jira_cloud` | `Jira Cloud` | Atlassian Cloud | Live Jira issues via OAuth 2.0 (3LO) connection. |
+All 10 tools are strictly **read-only**, tenant-scoped (`org_id`), and dynamically discovered via the MCP protocol:
 
-### Live-Data Features
-- **Zero-Config Local Database**: Automatically provisions and manages local SQLite database (`bugpilot.db`) on startup with zero external database dependencies.
-- **Production PostgreSQL Ready**: Set `DATABASE_URL=postgresql://user:pass@host:port/dbname` to scale out in production.
-- **Sprint Management**: Live sprints stored in database (`SprintModel` / `sprints` table) per tenant (`organization_id`).
-- **Sprint Linkage**: Issues link to sprints via `sprint_id`. MCP metric tools filter dynamically by `sprint_id`.
-- **Reopen Tracking**: Automatic status transition detection (from `Resolved`/`Closed` to `Open`/`In Progress`) increments `reopen_count` on `IssueModel` and updates `reopened_count` in domain analytics.
-- **Alembic Migrations**: Full schema evolution managed via `alembic/versions/`.
-
----
-
-## Technology Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **API** | FastAPI + Uvicorn |
-| **Database** | SQLAlchemy 2.0 ORM + Alembic migrations (SQLite by default, Postgres-compatible) |
-| **Auth & Security** | PyJWT + Passlib(bcrypt) + RBAC (Admin, Manager, Developer, Viewer) + Tenant Isolation |
-| **Validation** | Pydantic v2 + pydantic-settings |
-| **LLM** | Google Gemini API — provides live, evidence-grounded AI analysis when `GEMINI_API_KEY` is configured, with seamless, automatic fallback to deterministic reporting templates when the key is unset or unavailable |
-| **MCP** | Official MCP Python SDK (`mcp>=1.0.0`) |
-| **Analytics** | Pure Python stdlib + Pydantic |
-| **Reporting** | ReportLab (PDF export) |
-| **Frontend** | React 18 + TypeScript + Vite |
-| **Testing** | pytest + pytest-asyncio + httpx + pytest-cov |
+| # | Tool Name | Required / Optional Parameters | Description & Evidence Returned |
+|---|-----------|-------------------------------|---------------------------------|
+| 1 | `search_bugs` | `query: str`, `limit: int = 20` | Search bugs by keyword in issue key, title, summary, or description. |
+| 2 | `get_bug` | `bug_id: str` | Retrieve complete details for a single bug (severity, priority, root cause, business impact, environment, reproduction steps, fix version). |
+| 3 | `get_bug_metrics` | `sprint_id: Optional[str]`, `component: Optional[str]`, `project: Optional[str]` | Aggregated bug counts, open vs. resolved distributions, and severity breakdowns. |
+| 4 | `get_bug_trends` | `sprint_id: Optional[str]`, `component: Optional[str]`, `project: Optional[str]` | Monthly creation vs. resolution trends and historical sprint completion velocity. |
+| 5 | `get_aging_bugs` | `min_age_days: float = 0.0`, `limit: int = 50` | Open defects sorted descending by age in days to highlight SLA risk. |
+| 6 | `get_reopened_bugs` | `component: Optional[str]`, `limit: int = 50` | Defects that transitioned from Resolved/Closed back to Open/In Progress (`reopen_count > 0`). |
+| 7 | `get_component_risk` | `component: Optional[str]`, `project: Optional[str]` | Component-level risk scores (0–100), active open issue counts, and blast radius indicators. |
+| 8 | `get_release_risk` | `release: Optional[str]` | Fix version / release readiness assessment, overall risk score, and deployment verdict. |
+| 9 | `get_bug_history` | `bug_id: str` | Chronological status transition history, reopen timestamps, and developer discussion comments. |
+| 10 | `get_related_bugs` | `bug_id: str`, `limit: int = 10` | Related defects sharing component context, technical root cause, or explicit linked issue IDs. |
 
 ---
 
-## MCP Server & Tools
+## 3. Dynamic ReAct Orchestration & Comparative Analysis
 
-### Startup Command
-Run the MCP Server standalone over `stdio` transport:
-
-**Windows (PowerShell)**
-```powershell
-.\.venv\Scripts\python -m mcp_server.server
-```
-**macOS / Linux**
-```bash
-.venv/bin/python -m mcp_server.server
-```
-
-### Exposed READ-ONLY Tools
-
-| Tool | Parameters | Description |
-|------|------------|-------------|
-| `search_bugs` | `query: str`, `limit: int = 20` | Search bugs by keyword in key, title, or description. |
-| `get_bug` | `bug_id: str` | Retrieve details for a single bug by key or ID. |
-| `get_bug_metrics` | `sprint_id: Optional[str]`, `component: Optional[str]` | Get summary & breakdown metrics. |
-| `get_bug_trends` | `sprint_id: Optional[str]`, `component: Optional[str]` | Get creation/resolution and sprint trends. |
-| `get_aging_bugs` | `min_age_days: float = 0.0`, `limit: int = 50` | Get open bugs sorted descending by age in days. |
-| `get_reopened_bugs` | `component: Optional[str]`, `limit: int = 50` | Get bugs reopened one or more times. |
-| `get_component_risk` | `component: Optional[str]` | Get component risk scores & metrics. |
-| `get_release_risk` | `release: Optional[str]` | Get release risk scores & metrics. |
+The Orchestrator Agent operates on a genuine **Reasoning + Action (ReAct)** loop:
+1. **Intent & Out-of-Domain Guardrail**: Early checks filter non-engineering queries without wasting LLM/tool invocations.
+2. **Dynamic Tool Selection**: LLM decides each action (`CALL_TOOL`, `DELEGATE`, or `FINISH`) based on the query, dynamically discovered tools, and accumulated observations.
+3. **Iterative Multi-Candidate Inspection**:
+   - For comparative and ranking queries (*"analyze authentication bugs and identify the highest-risk issue"*), `search_bugs` discovers candidates.
+   - The Orchestrator iteratively invokes `get_bug` on **each candidate defect** before allowing `FINISH`, ensuring full technical evidence (root cause, blast radius, reproduction steps) is gathered.
+4. **Differentiated Evidence-Grounded Risk Scoring**:
+   - Evaluates severity, priority, status, production environment, security impact (e.g. SOC2/session hijacking), and technical root causes (e.g. race condition, crash).
+   - Generates non-saturating scores (0.0–99.5) to avoid artificial 100/100 ties.
+5. **Reflection Agent Quality Evaluation**:
+   - Validates generated reports against ground-truth MCP data to prevent hallucinations and confirm accurate reporting.
 
 ---
 
-## REST API (`/api/v1`)
+## 4. Multi-Tenancy & RBAC Security
 
-| Method | Path | Description |
+- **Tenant Isolation**: Every database record (`issues`, `sprints`, `users`, `audit_logs`) is strictly scoped by `organization_id` (e.g. `org-acme`). Cross-organization data access is blocked at the repository and MCP layers.
+- **Role-Based Access Control (RBAC)**:
+  - **Admin**: Full access, user management, and issue administration.
+  - **Engineer / Developer**: Create, update, transition, and analyze issues.
+  - **Viewer**: Read-only access to issues, analytics, and reports.
+- **Secrets Management**: No secret keys or credentials are hardcoded. JWT secrets, API keys, and environment variables are strictly loaded from `.env` and excluded from version control.
+
+---
+
+## 5. Technology Stack
+
+| Layer | Component | Technology |
 |---|---|---|
-| GET | `/api/health`, `/api/v1/health` | Liveness/readiness, includes active provider mode |
-| GET | `/api/v1/agents` | List available agents |
-| GET | `/api/v1/tools` | List available MCP tools |
-| GET | `/api/v1/metrics` | Scoped bug metrics |
-| POST | `/api/v1/chat` | Orchestrated agent chat |
-| POST | `/api/v1/auth/login`, `/auth/register` | Credential auth |
-| GET | `/api/v1/auth/me`, `/auth/roles` | Current user, available RBAC roles |
-| GET/POST | `/api/v1/auth/atlassian/login`, `/callback`, `/status`, `/logout` | Atlassian OAuth 2.0 (3LO) flow |
-| GET/POST/PUT/DELETE | `/api/v1/issues[/{issue_id}]` | Issue CRUD (SQLite/PostgreSQL-backed) |
-| GET/POST | `/api/v1/auth/jira/authorize`, `/callback` | Legacy Jira connect flow |
+| **Frontend** | Interactive UI | React 18 + TypeScript + Vite |
+| **Backend API** | REST API Server | FastAPI + Uvicorn + Pydantic v2 |
+| **Orchestration** | Agent Loop | ReAct Agent Framework + Specialist Delegation |
+| **LLM Gateway** | Inference Engine | Groq API (`llama-3.3-70b-versatile`) Primary + Local Ollama (`llama3.1:8b`) Fallback |
+| **Tool Protocol** | Tooling Layer | Official Python MCP SDK (`mcp>=1.0.0`) via `stdio` |
+| **Data Layer** | Persistent Database | SQLAlchemy 2.0 ORM + SQLite (`sqlite:///./bugpilot.db`) |
+| **Security** | Auth & RBAC | PyJWT (HS256) + Passlib (bcrypt) + Header-based Tenant Scoping |
+| **Quality** | Reflection & Test | Reflection Agent Grounding + Pytest (320 tests, 100% pass) |
 
 ---
 
-## Setup & Run
+## 6. Setup & Execution Guide
 
 ### Prerequisites
 - Python 3.12+
 - Node.js 18+ (for frontend)
 
-### 1. Clone and enter the project
+### 1. Backend Setup
 ```bash
-git clone <repo-url> bugpilot
+# Clone and enter project
 cd bugpilot
+
+# Create and activate virtual environment
+python -m venv .venv
+# Windows: .\.venv\Scripts\activate | macOS/Linux: source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment (defaults to SQLite with zero setup)
+cp .env.example .env
 ```
 
-### 2. Activate virtual environment and install backend dependencies
-
-**Windows (PowerShell)**
+### 2. Run Standalone MCP Server
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\activate
-pip install -r requirements.txt
-```
-**macOS / Linux**
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+# Windows
+.\.venv\Scripts\python -m mcp_server.server
+
+# macOS / Linux
+.venv/bin/python -m mcp_server.server
 ```
 
-### 3. Configure environment
+### 3. Run FastAPI Backend
 ```bash
-cp .env.example .env   # Windows: copy .env.example .env
-```
-Defaults work out of the box with zero external setup using the local SQLite database (`bugpilot.db`). Set `GEMINI_API_KEY` to enable live LLM analysis calls.
-
-### 4. Run Backend Test Suite
-```bash
-pytest -m "not llm" -q
+uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### 5. Build and Run Frontend
+### 4. Build & Run Frontend
 ```bash
 cd frontend
 npm install
@@ -172,7 +180,8 @@ npm run build
 npm run dev
 ```
 
-### 6. Run the API Server
+### 5. Execute Test Suite
 ```bash
-uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
+# Run all unit and integration tests (320 tests)
+pytest tests/unit tests/integration -q
 ```

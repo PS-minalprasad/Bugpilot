@@ -58,6 +58,18 @@ class DataProvider(ABC):
     @abstractmethod
     def search_bugs(self, query: str, limit: int = 100) -> List[Bug]:
         """
-        Perform a text search on bug summary/title, description, and key.
+        Search bugs matching query string across key, summary, and description.
         """
         pass
+
+    def get_bug_history(self, bug_id: str) -> Optional[dict]:
+        """
+        Retrieve chronological history, status transitions, and comments for a bug.
+        """
+        return None
+
+    def get_related_bugs(self, bug_id: str, limit: int = 10) -> List[Bug]:
+        """
+        Retrieve related bugs by linked IDs, matching component, or labels.
+        """
+        return []

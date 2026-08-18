@@ -2,7 +2,7 @@
 BugPilot — MCP Server Module (Phase 4)
 =======================================
 Real, independently runnable MCP server implementation using the official Python MCP SDK.
-Exposes 8 READ-ONLY tools connecting to AnalyticsService and DataProvider.
+Exposes 10 READ-ONLY tools connecting to AnalyticsService and DataProvider.
 """
 
 from typing import Any, Dict, Optional
@@ -45,7 +45,7 @@ def search_bugs(
     lim_int = _val(limit, 20)
     provider, _ = _get_services(org_id)
     bugs = provider.search_bugs(query=q_str, limit=lim_int)
-    fallback_ds = getattr(provider, "data_source", "PostgreSQL")
+    fallback_ds = getattr(provider, "data_source", "SQLite")
     return {
         "count": len(bugs),
         "bugs": [b.model_dump(mode="json") for b in bugs],
@@ -236,6 +236,54 @@ def get_release_risk(
         "release_risks": [r.model_dump(mode="json") for r in rel_risks],
         "data_source": analytics_result.summary.data_source
     }
+
+
+@app.tool(
+    name="get_bug_history",
+    description="Retrieve chronological status transitions, reopen history, and discussion comments for a bug (Read-Only)."
+)
+def get_bug_history(
+    bug_id: str = Field(..., description="Unique key or ID of the bug (e.g. BP-101)"),
+    org_id: Optional[str] = Field(default=None, description="Organization tenant ID")
+) -> Dict[str, Any]:
+    """Get chronological history and comments for a bug."""
+    b_id = _val(bug_id, "")
+    provider, _ = _get_services(org_id)
+    history = provider.get_bug_history(bug_id=b_id)
+    if not history:
+        return {
+            "found": False,
+            "error": f"Bug history for key '{b_id}' not found.",
+            "data_source": getattr(provider, "data_source", "Synthetic Demo Data")
+        }
+    return {
+        "found": True,
+        "history": history,
+        "data_source": history.get("data_source", getattr(provider, "data_source", "Synthetic Demo Data"))
+    }
+
+
+@app.tool(
+    name="get_related_bugs",
+    description="Retrieve related bugs sharing component, linked issue IDs, or project context for root-cause and impact analysis (Read-Only)."
+)
+def get_related_bugs(
+    bug_id: str = Field(..., description="Unique key or ID of the bug (e.g. BP-101)"),
+    limit: int = Field(default=10, ge=1, le=100, description="Maximum number of related bugs to return"),
+    org_id: Optional[str] = Field(default=None, description="Organization tenant ID")
+) -> Dict[str, Any]:
+    """Get related bugs."""
+    b_id = _val(bug_id, "")
+    lim_val = _val(limit, 10)
+    provider, _ = _get_services(org_id)
+    related_bugs = provider.get_related_bugs(bug_id=b_id, limit=lim_val)
+    fallback_ds = getattr(provider, "data_source", "Synthetic Demo Data")
+    return {
+        "count": len(related_bugs),
+        "related_bugs": [b.model_dump(mode="json") for b in related_bugs],
+        "data_source": related_bugs[0].data_source if related_bugs else fallback_ds
+    }
+
 
 
 def main():

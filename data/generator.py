@@ -1,7 +1,7 @@
 """
 BugPilot — Synthetic Data Generator
 ====================================
-Generates deterministic, realistic synthetic bugs and sprints.
+Generates deterministic, realistic Jira-compatible synthetic bugs and sprints.
 All issues carry the data_source = "Synthetic Demo Data" label.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import random
 from datetime import datetime, timedelta
-from typing import List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from models.bug import Bug, BugSeverity, BugStatus, BugPriority
 from models.sprint import Sprint, SprintStatus
@@ -17,7 +17,7 @@ from models.sprint import Sprint, SprintStatus
 
 def generate_synthetic_data(seed: int = 42) -> Tuple[List[Bug], List[Sprint]]:
     """
-    Generate ~1000 bugs and 20 sprints deterministically.
+    Generate ~1000 bugs and 20 sprints deterministically with rich evidence fields.
     """
     # 1. Setup deterministic random seed
     rng = random.Random(seed)
@@ -31,6 +31,7 @@ def generate_synthetic_data(seed: int = 42) -> Tuple[List[Bug], List[Sprint]]:
     users = ["alice", "bob", "charlie", "diana", "edward", "fiona", "george", "helen", "ian", "julia"]
     fix_versions = ["v1.0.0", "v1.1.0", "v1.2.0", "v1.3.0", "v2.0.0", "v2.1.0", "v2.2.0", "v3.0.0", "v3.1.0", "v3.2.0"]
     labels_pool = ["regression", "ui", "performance", "security", "api", "billing", "auth", "sprint-blocker", "tech-debt", "customer-facing"]
+    environments = ["production", "production", "staging", "development"]
 
     bug_summaries = {
         "auth": [
@@ -116,6 +117,122 @@ def generate_synthetic_data(seed: int = 42) -> Tuple[List[Bug], List[Sprint]]:
         ]
     }
 
+    root_causes = {
+        "auth": [
+            "Race condition in OAuth token exchange handler under concurrent requests.",
+            "Missing refresh token rotation lock causing token invalidation on concurrent calls.",
+            "Clock drift between auth cluster nodes exceeding JWT validation tolerance threshold.",
+            "Unbounded LDAP query buffer overflowing maximum socket read size.",
+        ],
+        "database": [
+            "Database connection pool lease timeout does not release uncommitted transaction handles.",
+            "Missing composite B-tree index on (tenant_id, created_at) causing sequential table scan.",
+            "Concurrent row-level locking order inverted across batch update microservices.",
+            "Schema migration DDL lock held while long-running analytics query was active.",
+        ],
+        "gateway": [
+            "Upstream reverse proxy timeout (10s) is shorter than longest downstream database transaction threshold.",
+            "Header whitelist filter regex dropped non-standard X-Authorization-Token headers.",
+            "TCP keepalive timeout mismatch between Cloudflare edge and internal reverse proxy.",
+            "Rate limiter token bucket state failed to persist to Redis cluster during node failover.",
+        ],
+        "billing": [
+            "Webhook idempotency key verification bypassed when retry payload contained different timestamp header.",
+            "Currency formatter hardcoded USD symbol for international multi-currency tenant accounts.",
+            "Stripe API client retry loop triggered parallel charge request without atomic lock.",
+            "Tax API rate limit caused fallback handler to raise unhandled NullPointerException.",
+        ],
+        "search": [
+            "Unbounded wildcard prefix aggregation caused Lucene heap memory exhaustion.",
+            "Kafka search ingestion consumer group fell out of sync after node rebalance.",
+            "Elasticsearch document deletion tombstone purge delayed by high indexing throughput.",
+            "Fuzzy match edit distance threshold set to 2 for short 3-character keywords.",
+        ],
+        "logging": [
+            "Synchronous disk flush enabled on high-throughput log appender thread.",
+            "Circular object reference in exception context caused JSON serialization stack overflow.",
+            "Log rotation cron executed before compressed archive upload completed.",
+            "Env var LOG_LEVEL=DEBUG mistakenly committed in default production helm chart.",
+        ],
+        "scheduler": [
+            "Redis distributed lock TTL expired before long-running batch job finished processing.",
+            "Quartz cluster scheduler heartbeats missed due to JVM garbage collection pauses.",
+            "Database connection error during cron trigger evaluation left schedule state orphaned.",
+            "UTC timezone conversion omitted daylight savings offset calculation in rule engine.",
+        ],
+        "cache": [
+            "Redis connection pool max_connections limit reached under sudden traffic spike.",
+            "Missing probabilistic early expiration (XFetch) allowed cache stampede on expired home feed key.",
+            "Cache key generation template lacked tenant_id namespace prefix.",
+            "In-memory L1 cache failed to invalidate upon receiving Redis pub/sub eviction message.",
+        ],
+        "notifications": [
+            "SMTP connection pool exhausted following intermittent network packet loss to mail relay.",
+            "SMS gateway payload serialization omitted multi-part GSM 03.38 character length checks.",
+            "APNs device token refresh hook dropped SSL context on silent push failures.",
+            "Webhook exponential backoff queue overflowed memory when third-party endpoint was down.",
+        ],
+        "analytics": [
+            "Timestamp parsing defaulted to server local timezone rather than UTC ISO-8601 offset.",
+            "Aggregator loaded entire monthly event stream into single in-memory DataFrame instead of batch chunking.",
+            "CSV streaming writer failed to escape embedded quotes and commas in user feedback text.",
+            "Client-side beacon queue dropped events during rapid page unloads without sendBeacon fallback.",
+        ],
+    }
+
+    business_impacts = {
+        "auth": [
+            "Degraded user login success rate by ~4.2% during peak morning authentication traffic.",
+            "Customer support ticket volume increased by 28% due to recurring session logout prompts.",
+            "Enterprise SSO customers unable to access workspace dashboards for approximately 35 minutes.",
+        ],
+        "database": [
+            "API response times degraded from 120ms to 4.5s across all dependent microservices.",
+            "Order creation pipeline blocked, delaying order fulfillment by up to 45 minutes.",
+            "Database primary CPU utilization reached 98%, risking total application downtime.",
+        ],
+        "gateway": [
+            "External API consumers received 502/504 Bad Gateway errors on ~6.5% of requests.",
+            "Mobile app clients unable to establish real-time WebSocket feeds during 15-minute outage.",
+            "Staging environment testing blocked for frontend engineering team.",
+        ],
+        "billing": [
+            "Affected 42 customer accounts with double charge authorizations before containment.",
+            "Delayed monthly subscription renewals and invoice delivery for international customers.",
+            "Financial reconciliation mismatch requiring manual ledger audit by accounting team.",
+        ],
+        "search": [
+            "E-commerce product discovery conversions declined by ~3.8% during search outage.",
+            "Customer search requests returned empty or stale results for recently updated catalog items.",
+            "Autocomplete suggestions failed to render on mobile web viewport.",
+        ],
+        "logging": [
+            "Compliance audit logs temporarily missing 12 minutes of security event history.",
+            "Production log shipper CPU saturation degraded collocated service response times.",
+            "SRE team delayed in diagnosing secondary incident due to corrupted log format.",
+        ],
+        "scheduler": [
+            "Automated daily reporting emails delivered twice to enterprise leadership subscribers.",
+            "Database maintenance vacuuming delayed by 24 hours, increasing table bloat by 15%.",
+            "Nightly batch invoice processing delayed until manual trigger by operations team.",
+        ],
+        "cache": [
+            "Database load spiked 3.5x as requests bypassed cache directly to PostgreSQL replica.",
+            "P99 latency on homepage content increased from 35ms to 850ms.",
+            "Cross-user cache collision temporarily displayed wrong user preference banner.",
+        ],
+        "notifications": [
+            "Critical security alert emails delayed by up to 25 minutes for 1,200 recipients.",
+            "SMS verification codes for signup flow timed out, blocking new customer registrations.",
+            "Third-party webhook consumers missed webhook event notifications during partner integration.",
+        ],
+        "analytics": [
+            "Executive dashboard displayed daily active user counts with ~8% calculation discrepancy.",
+            "Monthly executive billing export generated corrupted files requiring re-run.",
+            "Product team analytics funnels temporarily under-reported mobile checkout steps.",
+        ],
+    }
+
     # 3. Generate 20 sprints
     # Each sprint lasts 14 days. Sprints cover the last 280 days.
     sprints: List[Sprint] = []
@@ -149,7 +266,6 @@ def generate_synthetic_data(seed: int = 42) -> Tuple[List[Bug], List[Sprint]]:
     total_bugs_count = 1000
 
     # Ensure deterministic but structured distribution over time.
-    # Bugs are created across the 280 days duration.
     for idx in range(1, total_bugs_count + 1):
         # Choose project
         project = rng.choice(projects)
@@ -163,17 +279,10 @@ def generate_synthetic_data(seed: int = 42) -> Tuple[List[Bug], List[Sprint]]:
         summary = rng.choice(summary_list)
         if rng.random() > 0.6:
             summary = f"[{component.upper()}] {summary} (Case {idx})"
-        
-        description = (
-            f"Detailed description of the issue {key}.\n"
-            f"Steps to reproduce:\n1. Open application\n2. Trigger component {component}\n"
-            f"3. Issue occurred: {summary}.\n\n"
-            f"Severity assessment: based on component impact on critical workflows.\n"
-            f"This bug is generated as part of the Synthetic Demo Data."
-        )
 
         severity = rng.choice(list(BugSeverity))
         priority = rng.choice(list(BugPriority))
+        env = rng.choice(environments)
 
         # Assign creation date somewhere in the 280 days window
         offset_days = rng.uniform(0, 275)
@@ -231,16 +340,66 @@ def generate_synthetic_data(seed: int = 42) -> Tuple[List[Bug], List[Sprint]]:
             else:
                 updated_at = created_at
 
-        # Fix version assignments
+        # Fix version & affected version assignments
         version_idx = int((offset_days / 280.0) * len(fix_versions))
         version_idx = min(version_idx, len(fix_versions) - 1)
         fix_version = fix_versions[version_idx]
+        affected_version = fix_versions[max(0, version_idx - 1)]
 
         # Labels
         labels = rng.sample(labels_pool, k=rng.randint(1, 3))
 
         assignee = rng.choice(users) if status != BugStatus.OPEN else None
         reporter = rng.choice(users)
+
+        # Realistic Evidence Context
+        root_cause_item = rng.choice(root_causes[component]) if (status in {BugStatus.RESOLVED, BugStatus.CLOSED, BugStatus.IN_PROGRESS} or rng.random() < 0.7) else None
+        business_impact_item = rng.choice(business_impacts[component])
+        steps_item = (
+            f"1. Navigate to /{component} service endpoint.\n"
+            f"2. Trigger workflow with payload matching scenario {idx}.\n"
+            f"3. Observe system behavior under current workload profile."
+        )
+        expected_item = f"The {component} service handles the request successfully within normal SLA latency."
+        actual_item = f"Encountered unexpected behavior: {summary}."
+
+        # Realistic Engineering Comments
+        comments = []
+        if rng.random() < 0.85:
+            comments.append({
+                "author": reporter,
+                "created_at": (created_at + timedelta(minutes=15)).isoformat() + "Z",
+                "body": f"Logged issue during testing in {env}. Steps to reproduce verified.",
+            })
+        if status in {BugStatus.IN_PROGRESS, BugStatus.IN_REVIEW, BugStatus.RESOLVED, BugStatus.CLOSED} and assignee:
+            comments.append({
+                "author": assignee,
+                "created_at": (created_at + timedelta(hours=2)).isoformat() + "Z",
+                "body": f"Investigating root cause in {component} module. Identified potential fix in branch fix/{key.lower()}.",
+            })
+        if resolved_at and assignee:
+            comments.append({
+                "author": assignee,
+                "created_at": (resolved_at - timedelta(minutes=10)).isoformat() + "Z",
+                "body": f"Fix verified and deployed to {env}. Resolving issue.",
+            })
+
+        # Realistic Linked Issues
+        linked_issue_ids = []
+        if idx > 1 and rng.random() < 0.4:
+            other_idx = max(1, idx - rng.randint(1, 5))
+            linked_key = f"{project}-{other_idx}"
+            linked_issue_ids.append(linked_key)
+
+        description = (
+            f"Issue {key}: {summary}\n\n"
+            f"Environment: {env}\n"
+            f"Affected Version: {affected_version}\n\n"
+            f"Steps to Reproduce:\n{steps_item}\n\n"
+            f"Expected Behavior:\n{expected_item}\n\n"
+            f"Actual Behavior:\n{actual_item}\n\n"
+            f"Severity assessment: based on {component} impact on critical workflows."
+        )
 
         bug = Bug(
             id=key,
@@ -254,6 +413,16 @@ def generate_synthetic_data(seed: int = 42) -> Tuple[List[Bug], List[Sprint]]:
             priority=priority,
             status=status,
             resolution=resolution,
+            environment=env,
+            affected_version=affected_version,
+            fix_version=fix_version,
+            root_cause=root_cause_item,
+            business_impact=business_impact_item,
+            steps_to_reproduce=steps_item,
+            expected_behavior=expected_item,
+            actual_behavior=actual_item,
+            comments=comments,
+            linked_issue_ids=linked_issue_ids,
             component=component,
             labels=labels,
             reporter=reporter,
@@ -263,7 +432,6 @@ def generate_synthetic_data(seed: int = 42) -> Tuple[List[Bug], List[Sprint]]:
             resolved_at=resolved_at,
             sprint_id=assigned_sprint.id,
             sprint=assigned_sprint.id,
-            fix_version=fix_version,
             reopened_count=reopened_count,
             data_source="Synthetic Demo Data"
         )

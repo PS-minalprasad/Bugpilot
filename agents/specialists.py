@@ -107,7 +107,7 @@ class BugAnalystAgent(BaseAgent):
                         b_reporter = str(b_target.get("reporter") or "Unknown")
                         b_desc = str(b_target.get("description") or "No description provided.")
 
-                        from backend.llm.gemini_client import generate_analysis
+                        from backend.llm.gateway import generate_analysis
 
                         ai_analysis_text = await generate_analysis(
                             evidence={"bug": b_target, "component": b_component, "description": b_desc},

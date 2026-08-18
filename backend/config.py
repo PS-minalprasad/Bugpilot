@@ -88,17 +88,19 @@ class Settings(BaseSettings):
     DATA_LABEL: str = "SQLite"
 
     # -------------------------------------------------------------------------
-    # LLM (Phase 6)
+    # LLM Configuration (Groq Primary + Ollama Fallback)
     # -------------------------------------------------------------------------
-    LLM_PROVIDER: str = "gemini"
-    GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    LLM_PROVIDER: str = "groq"
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3.1:8b"
 
     # -------------------------------------------------------------------------
     # AI Guardrail Execution Limits (Phase 21)
     # -------------------------------------------------------------------------
-    MAX_AGENT_STEPS: int = 5
-    MAX_MCP_TOOL_CALLS: int = 10
+    MAX_AGENT_STEPS: int = 10
+    MAX_MCP_TOOL_CALLS: int = 15
     MAX_RETRIES: int = 3
     TOOL_TIMEOUT_SECONDS: float = 30.0
     LLM_TIMEOUT_SECONDS: float = 30.0
