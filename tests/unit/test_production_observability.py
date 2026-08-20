@@ -59,3 +59,39 @@ class TestProductionObservability:
             assert "mcp_server" in components
             assert "llm" in components
             assert "latency_ms" in components["database"]
+
+    def test_text_logging_formatter_redacts_secrets(self):
+        """Verify that SanitizedRichFormatter redacts passwords and tokens in text log records."""
+        import logging
+        from backend.core.logging import SanitizedRichFormatter, SecretSanitizingFilter
+
+        formatter = SanitizedRichFormatter("%(message)s")
+        record = logging.LogRecord(
+            name="test_logger",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="User login failed with password: SecretPass123! and Bearer eyJhbGciOi",
+            args=(),
+            exc_info=None,
+        )
+
+        formatted = formatter.format(record)
+        assert "SecretPass123!" not in formatted
+        assert "***REDACTED***" in formatted
+
+        # Test filter on args tuple
+        record_with_args = logging.LogRecord(
+            name="test_logger",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="Auth header: %s",
+            args=("Bearer eyJhbGciOi...",),
+            exc_info=None,
+        )
+        filt = SecretSanitizingFilter()
+        filt.filter(record_with_args)
+        formatted_args = formatter.format(record_with_args)
+        assert "eyJhbGciOi" not in formatted_args
+        assert "***REDACTED***" in formatted_args

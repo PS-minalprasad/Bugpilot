@@ -16,6 +16,92 @@ from mcp_client.client import MCPClient
 from agents.orchestrator import OrchestratorAgent
 from agents.reporting import ReflectionAgent
 from evaluation.golden_dataset import GOLDEN_EVALUATION_DATASET, EvaluationSample
+from backend.llm.gateway import get_last_usage
+from backend.llm.providers.groq import calculate_groq_cost
+
+
+def check_contextual_grounding(
+    answer: str,
+    fact: str,
+    target_entity: Optional[str] = None,
+    context_keywords: Optional[List[str]] = None,
+) -> bool:
+    """
+    Validates that a required fact is contextually grounded in the answer.
+    Checks that the fact is not just present as a disconnected substring, but
+    appears in proximity (same line, markdown table row, or context window)
+    to its target entity (e.g. bug key, component name) or domain field names.
+    """
+    if not answer or not fact:
+        return False
+
+    ans_lower = answer.lower()
+    fact_lower = fact.lower().strip()
+
+    if fact_lower not in ans_lower:
+        return False
+
+    # If no target entity or keywords are provided, presence in text satisfies
+    if not target_entity and not context_keywords:
+        return True
+
+    target_lower = target_entity.lower().strip() if target_entity else None
+    keywords = [k.lower() for k in (context_keywords or []) if k]
+
+    window_size = 120
+    start_idx = 0
+    while True:
+        idx = ans_lower.find(fact_lower, start_idx)
+        if idx == -1:
+            break
+
+        # Context window check
+        window_start = max(0, idx - window_size)
+        window_end = min(len(ans_lower), idx + len(fact_lower) + window_size)
+        window_text = ans_lower[window_start:window_end]
+
+        # Specific line / table row check
+        line_start = ans_lower.rfind("\n", 0, idx)
+        line_start = 0 if line_start == -1 else line_start + 1
+        line_end = ans_lower.find("\n", idx)
+        line_end = len(ans_lower) if line_end == -1 else line_end
+        line_text = ans_lower[line_start:line_end]
+
+        # Check target entity binding
+        if target_lower:
+            if target_lower in line_text:
+                return True
+
+            # If this is a multi-column data table row (e.g. | Authentication | 45.0 | 4 |)
+            # that describes a different entity, do not bleed across table rows
+            is_table_data_row = line_text.strip().startswith("|") and line_text.count("|") >= 3
+            is_kv_field_row = any(
+                kv in line_text
+                for kv in [
+                    "**field**",
+                    "**bug id**",
+                    "**severity**",
+                    "**status**",
+                    "**priority**",
+                    "**component**",
+                    "field | value",
+                ]
+            )
+
+            if is_table_data_row and not is_kv_field_row and (target_lower not in line_text):
+                start_idx = idx + 1
+                continue
+
+            if target_lower in window_text:
+                return True
+        else:
+            # No target entity: keyword must appear in line or proximate window
+            if any(kw in line_text or kw in window_text for kw in keywords):
+                return True
+
+        start_idx = idx + 1
+
+    return False
 
 
 class LatencyStats(BaseModel):
@@ -49,7 +135,12 @@ class SampleEvaluationResult(BaseModel):
     instruction_followed: bool = True
     safety_passed: bool = True
     is_failure_scenario: bool = False
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
     estimated_tokens: int = 0
+    cost_usd: float = 0.0
+    is_estimated_usage: bool = True
     latency_seconds: float
     final_answer_snippet: str
     final_answer: str = ""
@@ -73,8 +164,14 @@ class EvaluationSummary(BaseModel):
     safety_robustness_score: float
     recovery_rate: float
     average_reflection_score: float
+    total_prompt_tokens: int = 0
+    total_completion_tokens: int = 0
+    total_tokens: int = 0
     average_tokens_per_query: int
-    estimated_total_cost_usd: float
+    total_cost_usd: float = 0.0
+    estimated_total_cost_usd: float = 0.0
+    is_cost_estimated: bool = True
+    token_cost_label: str = "estimated (word count fallback)"
     latency: LatencyStats
     results: List[SampleEvaluationResult] = Field(default_factory=list)
 
@@ -181,14 +278,29 @@ class BugPilotEvaluator:
         else:
             tool_match = any(exp_tool in tools_used for exp_tool in sample.expected_tools)
 
-        # 4. Groundedness & Hallucination Check
+        # 4. Contextual Groundedness & Hallucination Check
         ans_lower = res.final_answer.lower()
         supported_facts_count = 0
         total_facts_expected = len(sample.required_facts)
 
+        # Context keywords to ensure fact is associated with the correct entity/domain field
+        context_keywords = []
+        if sample.expected_intent == "SPECIFIC_BUG":
+            context_keywords.extend(["bug", "issue", "status", "severity", "priority", "component", "environment"])
+        elif sample.expected_intent in ["METRIC", "BREAKDOWN"]:
+            context_keywords.extend(["total", "open", "resolved", "bugs", "count", "metrics", "rate"])
+        elif sample.expected_intent == "COMPONENT_ANALYSIS":
+            context_keywords.extend(["component", "risk", "score", "open issues", "critical", "analysis"])
+        elif sample.expected_intent == "TREND":
+            context_keywords.extend(["trend", "period", "sprint", "created", "resolved", "velocity"])
+        elif sample.expected_intent == "RELEASE_RISK":
+            context_keywords.extend(["release", "version", "risk", "deployment", "readiness"])
+
+        target_entity = sample.required_facts[0] if sample.required_facts else None
+
         if total_facts_expected > 0:
             for fact in sample.required_facts:
-                if fact.lower() in ans_lower:
+                if check_contextual_grounding(res.final_answer, fact, target_entity=target_entity, context_keywords=context_keywords):
                     supported_facts_count += 1
             groundedness_score = round(supported_facts_count / total_facts_expected, 2)
         else:
@@ -230,10 +342,21 @@ class BugPilotEvaluator:
         else:
             safety_passed = not hallucination_detected
 
-        # 9. Token Usage & Cost Estimation
-        tokens_prompt = len(sample.query.split()) * 4 + 350 * max(1, len(res.execution_steps))
-        tokens_completion = len(res.final_answer.split()) * 2
-        total_tokens = tokens_prompt + tokens_completion
+        # 9. Real vs Estimated Token Usage & Cost Calculation
+        last_usage = get_last_usage()
+        if last_usage and last_usage.get("is_real"):
+            prompt_tokens = int(last_usage.get("prompt_tokens", 0))
+            completion_tokens = int(last_usage.get("completion_tokens", 0))
+            total_tokens = int(last_usage.get("total_tokens", prompt_tokens + completion_tokens))
+            model_used = last_usage.get("model", "llama-3.3-70b-versatile")
+            cost_usd = calculate_groq_cost(prompt_tokens, completion_tokens, model=model_used)
+            is_estimated_usage = False
+        else:
+            prompt_tokens = len(sample.query.split()) * 4 + 350 * max(1, len(res.execution_steps))
+            completion_tokens = len(res.final_answer.split()) * 2
+            total_tokens = prompt_tokens + completion_tokens
+            cost_usd = calculate_groq_cost(prompt_tokens, completion_tokens, "llama-3.3-70b-versatile")
+            is_estimated_usage = True
 
         # 10. Task Success
         task_success = (
@@ -269,7 +392,12 @@ class BugPilotEvaluator:
             instruction_followed=instruction_followed,
             safety_passed=safety_passed,
             is_failure_scenario=sample.is_failure_scenario,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
             estimated_tokens=total_tokens,
+            cost_usd=cost_usd,
+            is_estimated_usage=is_estimated_usage,
             latency_seconds=round(elapsed, 4),
             final_answer_snippet=snippet.replace("\n", " "),
             final_answer=res.final_answer,
@@ -285,14 +413,12 @@ class BugPilotEvaluator:
         total_tools_called = 0
         successful_tools_called = 0
         necessary_tools_called = 0
-        total_tokens = 0
 
         async with MCPClient() as client:
             for sample in self.dataset:
                 res = await self.evaluate_sample(sample, client)
                 results.append(res)
                 latencies.append(res.latency_seconds)
-                total_tokens += res.estimated_tokens
 
                 total_tools_called += res.tool_calls_count
                 successful_tools_called += res.tool_calls_successful
@@ -327,9 +453,14 @@ class BugPilotEvaluator:
         else:
             recovery_rate = task_rate
 
-        avg_tokens = total_tokens // total_queries if total_queries else 0
-        # Cost estimate: ~$0.65 per 1M blended tokens on Groq Llama 3.3 70B
-        est_cost_usd = round((total_tokens / 1_000_000.0) * 0.65, 6)
+        tot_prompt = sum(r.prompt_tokens for r in results)
+        tot_comp = sum(r.completion_tokens for r in results)
+        tot_tokens = sum(r.total_tokens for r in results)
+        tot_cost = sum(r.cost_usd for r in results)
+        avg_tokens = tot_tokens // total_queries if total_queries else 0
+
+        is_estimated = any(r.is_estimated_usage for r in results)
+        cost_label = "estimated (word count fallback)" if is_estimated else "measured (Groq API usage)"
 
         latency_stats = self._compute_percentiles(latencies)
 
@@ -351,8 +482,14 @@ class BugPilotEvaluator:
             safety_robustness_score=round(safety_acc, 4),
             recovery_rate=round(recovery_rate, 4),
             average_reflection_score=round(avg_reflection, 4),
+            total_prompt_tokens=tot_prompt,
+            total_completion_tokens=tot_comp,
+            total_tokens=tot_tokens,
             average_tokens_per_query=avg_tokens,
-            estimated_total_cost_usd=est_cost_usd,
+            total_cost_usd=round(tot_cost, 6),
+            estimated_total_cost_usd=round(tot_cost, 6),
+            is_cost_estimated=is_estimated,
+            token_cost_label=cost_label,
             latency=latency_stats,
             results=results,
         )

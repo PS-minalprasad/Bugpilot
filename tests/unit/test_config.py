@@ -91,3 +91,24 @@ class TestNoHardcodedSecrets:
         assert s.GROQ_API_KEY == "", (
             "GROQ_API_KEY must default to empty string — never hardcode a key"
         )
+
+    def test_jwt_secret_insecure_default_rejected_in_production(self):
+        """In production/staging, default placeholder or empty JWT_SECRET must raise a hard error."""
+        with pytest.raises(ValueError, match="Insecure JWT_SECRET detected in 'production'"):
+            Settings(ENV="production", JWT_SECRET="bugpilot-super-secret-jwt-key-2026-change-in-production", _env_file=None)
+
+        with pytest.raises(ValueError, match="Insecure JWT_SECRET detected in 'staging'"):
+            Settings(ENV="staging", JWT_SECRET="", _env_file=None)
+
+    def test_jwt_secret_custom_accepted_in_production(self):
+        """In production, a strong unique custom JWT_SECRET is accepted."""
+        s = Settings(ENV="production", JWT_SECRET="strong-custom-production-secret-key-32chars!", _env_file=None)
+        assert s.JWT_SECRET == "strong-custom-production-secret-key-32chars!"
+
+    def test_jwt_secret_default_permitted_in_dev_and_test(self):
+        """In development and test environments, default secret is permitted for ease of local testing."""
+        s_test = Settings(ENV="test", _env_file=None)
+        assert s_test.JWT_SECRET is not None
+
+        s_dev = Settings(ENV="development", _env_file=None)
+        assert s_dev.JWT_SECRET is not None

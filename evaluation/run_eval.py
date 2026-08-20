@@ -59,7 +59,7 @@ async def main():
     print(f"  [6/11] Groundedness & Hallucination: Groundedness={eval_summary.groundedness_rate * 100:.1f}%, Hallucination Rate={eval_summary.hallucination_rate * 100:.1f}%")
     print(f"  [7/11] Reliability & Recovery Rate: {eval_summary.recovery_rate * 100:.1f}%")
     print(f"  [8/11] Latency: Mean={eval_summary.latency.mean}s, P50={eval_summary.latency.p50}s, P95={eval_summary.latency.p95}s, P99={eval_summary.latency.p99}s")
-    print(f"  [9/11] Token & Cost Usage: Avg Tokens={eval_summary.average_tokens_per_query} tokens/query, Est Cost=${eval_summary.estimated_total_cost_usd:.6f} USD")
+    print(f"  [9/11] Token & Cost Usage: Avg Tokens={eval_summary.average_tokens_per_query} tokens/query, Total Cost=${eval_summary.total_cost_usd:.6f} USD [{eval_summary.token_cost_label}]")
     print(f"  [10/11] Instruction Following Rate: {eval_summary.instruction_following_rate * 100:.1f}%")
     print(f"  [11/11] Safety & Robustness Score: {eval_summary.safety_robustness_score * 100:.1f}%")
 
@@ -68,8 +68,20 @@ async def main():
     load_tester = BugPilotLoadTester()
     load_report = await load_tester.run_load_test(concurrency_levels=[1, 5, 10, 25, 50], requests_per_user=2)
 
+    scalability_warnings = []
     for c_res in load_report.concurrency_results:
-        print(f"  * Concurrency {c_res.concurrency:2d} users: {c_res.throughput_rps:6.2f} req/s | P50={c_res.p50_latency_seconds:.4f}s | P95={c_res.p95_latency_seconds:.4f}s | Error Rate={c_res.error_rate * 100:.1f}%")
+        warn_indicator = ""
+        if c_res.error_rate > 0.10:
+            warn_indicator = " ⚠️ [CAPACITY BOTTLENECK / ERROR > 10%]"
+            scalability_warnings.append(
+                f"Concurrency {c_res.concurrency} users exceeded 10% error threshold ({c_res.error_rate * 100:.1f}% error rate). Capacity limit reached under high concurrent load."
+            )
+        print(f"  * Concurrency {c_res.concurrency:2d} users: {c_res.throughput_rps:6.2f} req/s | P50={c_res.p50_latency_seconds:.4f}s | P95={c_res.p95_latency_seconds:.4f}s | Error Rate={c_res.error_rate * 100:.1f}%{warn_indicator}")
+
+    if scalability_warnings:
+        print("\n  ⚠️  SCALABILITY & CAPACITY BOTTLENECK WARNINGS:")
+        for w in scalability_warnings:
+            print(f"    - {w}")
 
     # 3. Export Comprehensive JSON Evaluation Report
     full_report = {
@@ -77,6 +89,7 @@ async def main():
         "system": "BugPilot Multi-Agent Engineering Intelligence Platform",
         "agent_evaluation": eval_summary.model_dump(),
         "load_test_evaluation": load_report.model_dump(),
+        "scalability_warnings": scalability_warnings,
     }
 
     report_path = os.path.join(os.getcwd(), "evaluation_report.json")

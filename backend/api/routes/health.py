@@ -73,6 +73,9 @@ async def readiness() -> ReadinessResponse:
     db_healthy = check_database_health()
     db_latency_ms = round((time.time() - st) * 1000, 2)
 
+    from mcp_client.client import DEFAULT_ALLOWLIST
+    tools_count = len(DEFAULT_ALLOWLIST)
+
     components: Dict[str, Any] = {
         "config": {"status": "ready", "detail": "Configuration loaded successfully"},
         "logging": {"status": "ready", "detail": "Logging initialised"},
@@ -88,8 +91,8 @@ async def readiness() -> ReadinessResponse:
         },
         "mcp_server": {
             "status": "ready",
-            "tools_count": 8,
-            "detail": "MCP server online with 8 tools",
+            "tools_count": tools_count,
+            "detail": f"MCP server online with {tools_count} tools",
         },
         "llm": {
             "status": "ready" if (settings.GROQ_API_KEY or settings.OLLAMA_BASE_URL) else "not_configured",

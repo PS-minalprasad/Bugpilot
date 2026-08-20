@@ -190,3 +190,68 @@ async def test_6_recent_project_samples_evaluation():
         assert res_comp.task_success is True
         assert "Authentication" in res_comp.final_answer
 
+
+def test_7_contextual_grounding_vs_loose_substring_match():
+    """7. Verify contextual grounding rejects disconnected facts and confirms proximate facts."""
+    from evaluation.evaluator import check_contextual_grounding
+
+    # Case A: Fact 'critical' is properly contextualized inside BP-999 report table
+    valid_report = """
+    # Bug Analysis Report — BP-999
+    | Field | Value |
+    |---|---|
+    | **Bug ID** | BP-999 |
+    | **Severity** | critical |
+    | **Status** | open |
+    """
+    assert check_contextual_grounding(valid_report, "critical", target_entity="BP-999", context_keywords=["severity"]) is True
+    assert check_contextual_grounding(valid_report, "open", target_entity="BP-999", context_keywords=["status"]) is True
+
+    # Case B: Fact 'critical' appears only in an unrelated footer/disclaimer 500 chars away for a Low-severity bug BP-101
+    # Under old substring check: ("critical" in ans) -> TRUE (False Positive!)
+    # Under new contextual check -> FALSE (Correctly flags lack of grounding)
+    disconnected_text = """
+    # Bug Analysis Report — BP-101
+    | Field | Value |
+    |---|---|
+    | **Bug ID** | BP-101 |
+    | **Severity** | low |
+    | **Status** | closed |
+    
+    This defect was a minor cosmetic typo in the documentation sidebar.
+    No customer impact was observed during this sprint cycle.
+    
+    --------------------------------------------------------------------------------
+    Disclaimer & Global SRE Alert: Note that system-wide critical alerts require immediate triage.
+    """
+    # Searching for 'critical' with target entity 'BP-101'
+    assert check_contextual_grounding(disconnected_text, "critical", target_entity="BP-101", context_keywords=["severity"]) is False
+    # But 'low' is properly grounded near BP-101
+    assert check_contextual_grounding(disconnected_text, "low", target_entity="BP-101", context_keywords=["severity"]) is True
+
+    # Case C: Component risk score '45.0' near 'Authentication'
+    comp_report = """
+    | Component | Risk Score | Open Issues |
+    |---|---|---|
+    | Authentication | 45.0 | 4 |
+    | Billing | 12.0 | 1 |
+    """
+    assert check_contextual_grounding(comp_report, "45.0", target_entity="Authentication", context_keywords=["risk", "score"]) is True
+    assert check_contextual_grounding(comp_report, "45.0", target_entity="Billing", context_keywords=["risk", "score"]) is False
+
+
+def test_8_groq_pricing_and_cost_calculation():
+    """8. Test real Groq model pricing calculations."""
+    from backend.llm.providers.groq import calculate_groq_cost
+
+    # Llama 3.3 70B: $0.59 / 1M prompt, $0.79 / 1M completion
+    # 1,000 prompt tokens + 1,000 completion tokens = (0.59 + 0.79) / 1000 = $0.00138
+    cost_70b = calculate_groq_cost(1000, 1000, model="llama-3.3-70b-versatile")
+    assert round(cost_70b, 6) == 0.00138
+
+    # Llama 3.1 8B: $0.05 / 1M prompt, $0.08 / 1M completion
+    # 10,000 prompt tokens + 5,000 completion tokens = (10k*0.05 + 5k*0.08)/1M = $0.0009
+    cost_8b = calculate_groq_cost(10000, 5000, model="llama-3.1-8b-instant")
+    assert round(cost_8b, 6) == 0.0009
+
+

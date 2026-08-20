@@ -48,7 +48,7 @@ class NumberedCanvas(canvas.Canvas):
         
         self.restoreState()
 
-def generate_pdf(filename="C:\\Users\\MinalPrasad\\Desktop\\BugPilot_User_Guide.pdf"):
+def generate_pdf(filename="./BugPilot_User_Guide.pdf"):
     doc = SimpleDocTemplate(
         filename,
         pagesize=letter,
@@ -286,7 +286,7 @@ def generate_pdf(filename="C:\\Users\\MinalPrasad\\Desktop\\BugPilot_User_Guide.
     story.append(Paragraph("<b>Answer:</b> Make sure you started the backend server in Step 3 first! The frontend needs the backend running on port 8000 to fetch metrics and agent responses.", body_style))
 
     story.append(Paragraph("Q: Is my actual application data uploaded anywhere?", h2_style))
-    story.append(Paragraph("<b>Answer:</b> No! BugPilot uses a local <b>PostgreSQL</b> or synthetic data store running entirely inside your computer. No real data or company credentials leave your device.", body_style))
+    story.append(Paragraph("<b>Answer:</b> No! BugPilot uses a local <b>SQLite</b> or synthetic data store running entirely inside your computer. No real data or company credentials leave your device.", body_style))
 
     story.append(Paragraph("Q: How do I stop BugPilot when I am finished?", h2_style))
     story.append(Paragraph("<b>Answer:</b> Go to your open PowerShell windows and press <b>Ctrl + C</b> to stop the running servers.", body_style))

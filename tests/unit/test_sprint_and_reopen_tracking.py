@@ -1,8 +1,8 @@
 """
-BugPilot — Live User Data & Dynamic MCP Integration Test Suite
-===============================================================
+BugPilot — Sprint Filtering & Reopen-Count Tracking Test Suite
+==============================================================
 Verifies:
-1. Issues created with distinct sprint_id values flow cleanly to PostgreSQL and MCP tools.
+1. Issues created with distinct sprint_id values flow cleanly to database and MCP tools.
 2. Reopening a resolved/closed issue increments reopen_count.
 3. get_bug_metrics(sprint_id=...) and get_bug_trends(sprint_id=...) filter correctly by real sprint data.
 4. get_reopened_bugs reflects real reopened issue counts.
@@ -19,7 +19,7 @@ from backend.database.repository import (
     db_get_issue_by_id_or_key,
     db_get_sprints,
 )
-from providers.postgres_provider import PostgresProvider
+from providers import get_data_provider, SQLDataProvider
 from mcp_server.server import get_bug_metrics, get_bug_trends, get_reopened_bugs
 
 client = TestClient(app)
@@ -60,7 +60,7 @@ def test_live_sprints_and_issue_filtering():
             },
         )
 
-    provider = PostgresProvider(org_id="org-acme")
+    provider = SQLDataProvider(org_id="org-acme")
     sprint1_bugs = provider.get_bugs(sprint_id="SPRINT-2026-01")
     sprint2_bugs = provider.get_bugs(sprint_id="SPRINT-2026-02")
 
@@ -106,8 +106,8 @@ def test_reopen_count_status_transition_tracking():
     assert reopened_iss.status == "Open"
     assert reopened_iss.reopen_count == 1
 
-    # 4. Verify PostgresProvider domain model mapping
-    provider = PostgresProvider(org_id="org-acme")
+    # 4. Verify SQLDataProvider domain model mapping
+    provider = SQLDataProvider(org_id="org-acme")
     bug_domain = provider.get_bug("REOPEN-1")
     assert bug_domain is not None
     assert bug_domain.reopened_count == 1

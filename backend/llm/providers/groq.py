@@ -31,10 +31,40 @@ FALLBACK_MODELS = [
     "groq/compound-mini",
 ]
 
+# Official Groq pricing table (USD per 1M tokens)
+GROQ_MODEL_PRICING: Dict[str, Dict[str, float]] = {
+    "llama-3.3-70b-versatile": {"prompt_per_million": 0.59, "completion_per_million": 0.79},
+    "llama-3.1-70b-versatile": {"prompt_per_million": 0.59, "completion_per_million": 0.79},
+    "llama-3.1-8b-instant": {"prompt_per_million": 0.05, "completion_per_million": 0.08},
+    "openai/gpt-oss-120b": {"prompt_per_million": 0.59, "completion_per_million": 0.79},
+    "openai/gpt-oss-20b": {"prompt_per_million": 0.20, "completion_per_million": 0.20},
+    "qwen/qwen3.6-27b": {"prompt_per_million": 0.20, "completion_per_million": 0.20},
+}
+
+
+def calculate_groq_cost(
+    prompt_tokens: int,
+    completion_tokens: int,
+    model: str = "llama-3.3-70b-versatile",
+) -> float:
+    """Calculates actual cost in USD based on official Groq pricing per model."""
+    pricing = GROQ_MODEL_PRICING.get(
+        model, {"prompt_per_million": 0.59, "completion_per_million": 0.79}
+    )
+    prompt_cost = (prompt_tokens / 1_000_000.0) * pricing["prompt_per_million"]
+    comp_cost = (completion_tokens / 1_000_000.0) * pricing["completion_per_million"]
+    return round(prompt_cost + comp_cost, 7)
 
 
 class GroqProvider(BaseLLMProvider):
-    """Groq LLM provider implementation."""
+    """Groq LLM provider implementation with real token usage recording."""
+
+    def __init__(self) -> None:
+        self._last_usage: Optional[Dict[str, Any]] = None
+
+    def get_last_usage(self) -> Optional[Dict[str, Any]]:
+        """Returns real token usage from the most recent Groq API call, if available."""
+        return self._last_usage
 
     @property
     def provider_name(self) -> str:
@@ -128,6 +158,18 @@ class GroqProvider(BaseLLMProvider):
                         raise RuntimeError(f"Groq API error HTTP {response.status_code}: {response.text[:300]}")
 
                     data = response.json()
+                    usage_dict = data.get("usage", {})
+                    if usage_dict:
+                        p_tokens = int(usage_dict.get("prompt_tokens", 0))
+                        c_tokens = int(usage_dict.get("completion_tokens", 0))
+                        t_tokens = int(usage_dict.get("total_tokens", p_tokens + c_tokens))
+                        self._last_usage = {
+                            "prompt_tokens": p_tokens,
+                            "completion_tokens": c_tokens,
+                            "total_tokens": t_tokens,
+                            "model": model,
+                            "is_real": True,
+                        }
                     raw_text = self._extract_content(data)
                     parsed_dict = json.loads(raw_text)
                     return ReActDecision.model_validate(parsed_dict)
@@ -192,6 +234,18 @@ class GroqProvider(BaseLLMProvider):
                         raise RuntimeError(f"Groq API error HTTP {response.status_code}: {response.text[:300]}")
 
                     data = response.json()
+                    usage_dict = data.get("usage", {})
+                    if usage_dict:
+                        p_tokens = int(usage_dict.get("prompt_tokens", 0))
+                        c_tokens = int(usage_dict.get("completion_tokens", 0))
+                        t_tokens = int(usage_dict.get("total_tokens", p_tokens + c_tokens))
+                        self._last_usage = {
+                            "prompt_tokens": p_tokens,
+                            "completion_tokens": c_tokens,
+                            "total_tokens": t_tokens,
+                            "model": model,
+                            "is_real": True,
+                        }
                     return self._extract_content(data)
 
                 except Exception as exc:

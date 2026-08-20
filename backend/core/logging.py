@@ -46,8 +46,38 @@ def setup_logging(level: str = "INFO", fmt: str = "text") -> None:
     _configured = True
 
 
+class SecretSanitizingFilter(logging.Filter):
+    """Filter that scrubs secrets from record.msg and record.args before emission."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = sanitize_sensitive_data(record.msg)
+        if record.args:
+            if isinstance(record.args, dict):
+                record.args = sanitize_sensitive_data(record.args)
+            elif isinstance(record.args, tuple):
+                record.args = tuple(sanitize_sensitive_data(a) for a in record.args)
+            elif isinstance(record.args, list):
+                record.args = [sanitize_sensitive_data(a) for a in record.args]
+        return True
+
+
+class SanitizedRichFormatter(logging.Formatter):
+    """Formatter that sanitizes secrets before Rich renders output."""
+    def format(self, record: logging.LogRecord) -> str:
+        if isinstance(record.msg, str):
+            record.msg = sanitize_sensitive_data(record.msg)
+        if record.args:
+            if isinstance(record.args, dict):
+                record.args = sanitize_sensitive_data(record.args)
+            elif isinstance(record.args, tuple):
+                record.args = tuple(sanitize_sensitive_data(a) for a in record.args)
+            elif isinstance(record.args, list):
+                record.args = [sanitize_sensitive_data(a) for a in record.args]
+        return super().format(record)
+
+
 def _setup_rich_logging(level: int) -> None:
-    """Human-readable coloured logging via Rich."""
+    """Human-readable coloured logging via Rich with sensitive secret sanitization."""
     handler = RichHandler(
         console=_console,
         show_time=True,
@@ -58,6 +88,8 @@ def _setup_rich_logging(level: int) -> None:
         log_time_format="[%H:%M:%S]",
     )
     handler.setLevel(level)
+    handler.addFilter(SecretSanitizingFilter())
+    handler.setFormatter(SanitizedRichFormatter("%(message)s", datefmt="[%H:%M:%S]"))
 
     logging.basicConfig(
         level=level,

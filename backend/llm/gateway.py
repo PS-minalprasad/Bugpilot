@@ -187,6 +187,12 @@ class LLMGateway:
 
         return None
 
+    def get_last_usage(self) -> Optional[Dict[str, Any]]:
+        """Returns real token usage from primary provider if available."""
+        if hasattr(self.primary, "get_last_usage"):
+            return self.primary.get_last_usage()
+        return None
+
 
 # Global Gateway Singleton
 default_gateway = LLMGateway()
@@ -216,3 +222,8 @@ async def generate_analysis(
         evidence=evidence,
         question=question,
     )
+
+
+def get_last_usage() -> Optional[Dict[str, Any]]:
+    """Returns token usage metadata from the most recent LLM call."""
+    return default_gateway.get_last_usage()

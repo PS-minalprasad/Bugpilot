@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import List
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -131,6 +131,18 @@ class Settings(BaseSettings):
         if upper not in allowed:
             raise ValueError(f"LOG_LEVEL must be one of {allowed}, got: {v!r}")
         return upper
+
+    @model_validator(mode="after")
+    def validate_jwt_secret_security(self) -> "Settings":
+        env_val = str(self.ENV).strip().lower()
+        dev_envs = {"development", "dev", "local", "test", "testing"}
+        if env_val not in dev_envs:
+            if not self.JWT_SECRET or self.JWT_SECRET == "bugpilot-super-secret-jwt-key-2026-change-in-production":
+                raise ValueError(
+                    f"Insecure JWT_SECRET detected in '{self.ENV}' environment! "
+                    "JWT_SECRET cannot be unset or use default placeholder in non-dev environments."
+                )
+        return self
 
     # -------------------------------------------------------------------------
     # Helpers
