@@ -27,7 +27,7 @@ Flow:
        |
        +---- FINISH -----------> Final Answer
 
-The orchestrator does NOT use keyword-based tool routing.
+The orchestrator does NOT use keyword-based tool routing to select tools.
 The LLM dynamically decides the next action from:
 
 1. User goal
@@ -35,6 +35,9 @@ The LLM dynamically decides the next action from:
 3. Previous observations
 4. Previous execution steps
 5. Current agent state
+
+(Note: A guardrail exists solely to delay FINISH on comparative/ranking queries
+until all candidate issues have been inspected with get_bug.)
 
 Supported LLM actions:
 
