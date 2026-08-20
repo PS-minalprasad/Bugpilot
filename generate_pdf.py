@@ -230,7 +230,7 @@ def generate_pdf(filename="./BugPilot_User_Guide.pdf"):
 
     story.append(Paragraph("Step 2: Navigate to Project Folder", h2_style))
     story.append(Paragraph("Copy and paste this command into PowerShell and press <b>Enter</b>:", body_style))
-    story.append(Paragraph("cd C:\\Users\\MinalPrasad\\Desktop\\bugpilot", code_style))
+    story.append(Paragraph("cd bugpilot", code_style))
 
     story.append(Paragraph("Step 3: Launch the Backend API Server", h2_style))
     story.append(Paragraph("Copy and paste this command to start the Python backend server:", body_style))
@@ -239,7 +239,7 @@ def generate_pdf(filename="./BugPilot_User_Guide.pdf"):
 
     story.append(Paragraph("Step 4: Launch the Web Dashboard (Frontend)", h2_style))
     story.append(Paragraph("Open a <b>second</b> PowerShell window, navigate back to the folder, and start the frontend:", body_style))
-    story.append(Paragraph("cd C:\\Users\\MinalPrasad\\Desktop\\bugpilot\\frontend\nnpm run dev", code_style))
+    story.append(Paragraph("cd bugpilot\\frontend\nnpm run dev", code_style))
 
     story.append(Paragraph("Step 5: View the Web App", h2_style))
     story.append(Paragraph("Open your internet browser (Chrome, Edge, or Firefox) and go to:", body_style))
