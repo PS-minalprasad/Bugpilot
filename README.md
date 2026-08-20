@@ -1091,8 +1091,9 @@ Final Grounded Report
 The exact trajectory depends on the task and the decisions made by the orchestrator.
 
 ---
-
 # 📁 Project Structure
+
+The core agentic, analytics, provider, and MCP components are organized at the repository root, while the FastAPI application logic is contained under `backend/`.
 
 ```text
 bugpilot/
@@ -1155,7 +1156,7 @@ bugpilot/
 |---|---|
 | `agents/` | ReAct orchestrator, specialist agents, and reflection agent |
 | `analytics/` | Deterministic bug metrics, trends, and risk calculations |
-| `models/` | Domain and response models such as `Bug`, `Report`, and `ReflectionResult` |
+| `models/` | Domain models such as `Bug`, `Report`, and `ReflectionResult` |
 | `providers/` | Data-provider abstraction and SQL/SQLite implementation |
 | `mcp_client/` | MCP client, dynamic tool discovery, and tool execution |
 | `mcp_server/` | MCP server and read-only analytical tools |
