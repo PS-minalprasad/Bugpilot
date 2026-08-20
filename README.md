@@ -1097,10 +1097,33 @@ The exact trajectory depends on the task and the decisions made by the orchestra
 ```text
 bugpilot/
 │
+├── agents/
+│   ├── orchestrator.py
+│   ├── bug_analyst.py
+│   ├── trend_analyst.py
+│   ├── risk_analyst.py
+│   └── reflection_agent.py
+│
+├── analytics/
+│   └── ...
+│
+├── models/
+│   └── ...
+│
+├── providers/
+│   ├── data_provider.py
+│   └── sql_data_provider.py
+│
+├── mcp_client/
+│   └── ...
+│
+├── mcp_server/
+│   ├── server.py
+│   └── tools/
+│
 ├── backend/
 │   ├── api/
 │   │   └── routes/
-│   ├── agents/
 │   ├── core/
 │   ├── llm/
 │   │   └── providers/
@@ -1108,10 +1131,6 @@ bugpilot/
 │   ├── services/
 │   ├── config.py
 │   └── main.py
-│
-├── mcp_server/
-│   ├── server.py
-│   └── tools/
 │
 ├── evaluation/
 │   ├── evaluator.py
@@ -1129,6 +1148,23 @@ bugpilot/
 ├── .gitignore
 └── README.md
 ```
+
+### Key Architectural Modules
+
+| Module | Responsibility |
+|---|---|
+| `agents/` | ReAct orchestrator, specialist agents, and reflection agent |
+| `analytics/` | Deterministic bug metrics, trends, and risk calculations |
+| `models/` | Domain and response models such as `Bug`, `Report`, and `ReflectionResult` |
+| `providers/` | Data-provider abstraction and SQL/SQLite implementation |
+| `mcp_client/` | MCP client, dynamic tool discovery, and tool execution |
+| `mcp_server/` | MCP server and read-only analytical tools |
+| `backend/` | FastAPI API, authentication, security, LLM gateway, and application services |
+| `evaluation/` | Agent evaluation, quality metrics, and scalability testing |
+| `tests/` | Unit and integration test suites |
+| `frontend/` | React + TypeScript + Vite user interface |
+
+
 
 ---
 
@@ -1316,7 +1352,3 @@ Designed for future provider integration; not required for the current demonstra
 
 ---
 
-
-# 📄 License
-
-Add the appropriate project license here if this repository is intended for public distribution.
