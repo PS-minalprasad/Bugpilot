@@ -879,6 +879,39 @@ Install:
 
 ---
 
+## LLM Provider Setup (Required for Chat/Analysis)
+
+BugPilot needs **at least one** of the following before chat or analysis
+features will work. The backend and frontend will still start and the
+health/data endpoints will work without this — but chat requests will fail
+until one provider is configured.
+
+**Option A — Groq (recommended, free, no local install)**
+
+1. Get a free API key at [https://console.groq.com](https://console.groq.com)
+2. Set it in your `.env` file:
+
+   ```text
+   GROQ_API_KEY=your-key-here
+   ```
+
+**Option B — Ollama (local, no API key needed)**
+
+1. Install Ollama: [https://ollama.com](https://ollama.com)
+2. Pull the fallback model:
+
+   ```bash
+   ollama pull llama3.1:8b
+   ```
+
+3. Ollama runs automatically as the fallback if Groq is unavailable, using
+   `OLLAMA_BASE_URL` (default `http://localhost:11434`) from your `.env`.
+
+You can configure both — Groq is tried first, and BugPilot automatically
+fails over to Ollama if the Groq request fails.
+
+---
+
 ## 1. Clone Repository
 
 ```bash
@@ -1099,42 +1132,69 @@ The core agentic, analytics, provider, and MCP components are organized at the r
 bugpilot/
 │
 ├── agents/
-│   ├── orchestrator.py
-│   ├── bug_analyst.py
-│   ├── trend_analyst.py
-│   ├── risk_analyst.py
-│   └── reflection_agent.py
+│   ├── orchestrator.py          # ReAct orchestrator (LLM decision loop)
+│   ├── specialists.py           # Bug Analyst, Trend Analyst, Risk Analyst
+│   ├── reporting.py             # Report Agent + Reflection Agent
+│   ├── base.py                  # BaseAgent, AgentResult
+│   └── orchestration_models.py  # OrchestrationResult, StepMetadata
 │
 ├── analytics/
-│   └── ...
+│   └── service.py                # Deterministic metrics/trend/risk calculations
 │
 ├── models/
-│   └── ...
+│   ├── bug.py
+│   ├── report.py
+│   ├── sprint.py
+│   ├── analysis.py
+│   └── analytics.py
 │
 ├── providers/
-│   ├── data_provider.py
-│   └── sql_data_provider.py
+│   ├── base.py                  # Provider contract
+│   ├── data_provider.py         # SQL/SQLite data provider
+│   ├── synthetic_provider.py    # Synthetic demo data generator
+│   └── postgres_provider.py     # PostgreSQL provider stub
 │
 ├── mcp_client/
-│   └── ...
+│   └── client.py                 # MCP client (stdio, discovery, allowlist)
 │
 ├── mcp_server/
-│   ├── server.py
-│   └── tools/
+│   └── server.py                 # MCP server + all 10 tools (defined inline)
 │
 ├── backend/
 │   ├── api/
 │   │   └── routes/
+│   │       ├── auth.py
+│   │       ├── health.py
+│   │       ├── issues.py
+│   │       └── v1.py             # Chat / orchestrator route
 │   ├── core/
+│   │   ├── exceptions.py
+│   │   ├── logging.py
+│   │   └── observability.py
+│   ├── database/
+│   │   ├── models.py
+│   │   ├── repository.py
+│   │   └── session.py
 │   ├── llm/
+│   │   ├── gateway.py            # Groq -> Ollama failover gateway
+│   │   ├── base.py
+│   │   ├── schemas.py            # ReActDecision Pydantic schema
+│   │   ├── prompts.py
 │   │   └── providers/
+│   │       ├── groq.py
+│   │       └── ollama.py
 │   ├── security/
-│   ├── services/
+│   │   ├── auth.py               # JWT
+│   │   ├── middleware.py
+│   │   ├── dependencies.py
+│   │   └── prompt_injection.py
 │   ├── config.py
 │   └── main.py
 │
 ├── evaluation/
 │   ├── evaluator.py
+│   ├── golden_dataset.py
+│   ├── load_tester.py
 │   └── run_eval.py
 │
 ├── tests/
@@ -1142,7 +1202,10 @@ bugpilot/
 │   └── integration/
 │
 ├── frontend/
+│   └── src/                      # React + TypeScript + Vite
 │
+├── alembic/                       # Database migrations
+├── data/                          # Synthetic data generator
 ├── generate_pdf.py
 ├── requirements.txt
 ├── .env.example
@@ -1154,14 +1217,14 @@ bugpilot/
 
 | Module | Responsibility |
 |---|---|
-| `agents/` | ReAct orchestrator, specialist agents, and reflection agent |
+| `agents/` | ReAct orchestrator (`orchestrator.py`), specialist agents (`specialists.py`), and Report/Reflection agents (`reporting.py`) |
 | `analytics/` | Deterministic bug metrics, trends, and risk calculations |
-| `models/` | Domain models such as `Bug`, `Report`, and `ReflectionResult` |
-| `providers/` | Data-provider abstraction and SQL/SQLite implementation |
-| `mcp_client/` | MCP client, dynamic tool discovery, and tool execution |
-| `mcp_server/` | MCP server and read-only analytical tools |
-| `backend/` | FastAPI API, authentication, security, LLM gateway, and application services |
-| `evaluation/` | Agent evaluation, quality metrics, and scalability testing |
+| `models/` | Domain models such as `Bug`, `Report`, `Sprint`, and analysis/analytics schemas |
+| `providers/` | Data-provider abstraction (`base.py`) with SQL (`data_provider.py`), synthetic, and PostgreSQL implementations |
+| `mcp_client/` | MCP client — dynamic tool discovery, allowlist enforcement, timeout guards |
+| `mcp_server/` | MCP server exposing 10 read-only analytical tools |
+| `backend/` | FastAPI API, authentication, security, LLM gateway, and database layer |
+| `evaluation/` | Agent evaluation, quality metrics, and scalability/load testing |
 | `tests/` | Unit and integration test suites |
 | `frontend/` | React + TypeScript + Vite user interface |
 
